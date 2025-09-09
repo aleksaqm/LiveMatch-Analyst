@@ -125,6 +125,7 @@ Cilj je prepoznati ključnu sekvencu koja menja tok utakmice.
 CEP je ključan za prepoznavanje obrazaca u toku događaja.
 
 - **Detekcija serije poena (Scoring Run):** Sistem treba da detektuje kada jedan tim postigne npr. 8 ili više poena zaredom, bez poena protivnika.
+
   ```drl
   when
       accumulate (
@@ -140,6 +141,30 @@ CEP je ključan za prepoznavanje obrazaca u toku događaja.
       ($run >= 8)
   then
       insert(new CommentaryLine("Kakva serija tima " + $team + "! Rezultat je " + $run + "-0 u poslednja dva minuta!", Importance.HIGH));
+  ```
+
+- **Detekcija defanzivne dominacije (Defensive Stop Streak):** Sistem treba da detektuje situaciju kada jedan tim u kratkom vremenskom periodu (npr. 2 minuta) natera protivnika na minimum 6 uzastopnih neuspešnih napada (promašaj ili izgubljena lopta). Ovo je indikator jake defanzivne serije.
+
+  ```drl
+  when
+      // Akumuliramo neuspešne napade protivnika u okviru prozora od 1 minuta
+      accumulate (
+          GameEvent(
+              (type == EventType.SHOT_MISSED || type == EventType.TURNOVER),
+              $team: teamId
+          ) over window:time(2m),
+          $stops: count(1)
+      )
+      // Proveravamo da u istom prozoru nema pogodaka tog tima
+      not (GameEvent(type == EventType.SHOT_MADE, teamId == $team) over window:time(1m))
+      ($stops >= 6)
+  then
+      insert(new CommentaryLine(
+          "Odlična defanziva! Tim " + $team + " je zaustavljen u šest uzastopnih napada u poslednja 2 minuta.",
+          Importance.HIGH,
+          Type.ANALYSIS
+      ));
+  end
   ```
 
 #### **3. Primer Backward-Chaininga (Queries)**
