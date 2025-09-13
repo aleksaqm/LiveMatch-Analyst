@@ -1,0 +1,46 @@
+package basicrules;
+
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.events.GameEvent.EventType;
+import com.ftn.sbnz.model.models.PlayerStats;
+import com.ftn.sbnz.model.models.Player;
+import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.CommentaryLine.Importance;
+import com.ftn.sbnz.model.models.CommentaryLine.Type;
+
+// Pravilo 1: Trojka
+rule "ThreePointerComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setThreePointersMade($stats.getThreePointersMade() + 1),
+        setPoints($stats.getPoints() + 3)
+    }
+    insert(new CommentaryLine("Trojka! Igrač " + $playerName + " iz tima " + $teamName + " je pogodio trojku!", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+// Pravilo 2: Šesta trojka
+rule "SixthThreePointerComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
+    $stats: PlayerStats(playerId == $playerId, threePointersMade >= 6)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
+end
+
+// Pravilo 3: Prilika za kontru
+rule "FastbreakOpportunityComment"
+when
+    $event: GameEvent(eventType == EventType.TURNOVER, $teamId: teamId)
+    $team: Team(id == $teamId)
+    $opponent: Team(id != $teamId, $opponentName: name)
+then
+    insert(new CommentaryLine("Prilika za brzu kontru za tim " + $opponentName + "!", Importance.MEDIUM, Type.ANALYSIS));
+end

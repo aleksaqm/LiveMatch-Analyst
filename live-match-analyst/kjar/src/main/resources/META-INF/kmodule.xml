@@ -6,4 +6,7 @@
     <kbase name="cepKbase" eventProcessingMode="stream" packages="cep">
         <ksession name="cepKsession" clockType="pseudo" />
     </kbase>
+    <kbase name="basicKbase" eventProcessingMode="stream" packages="basicrules">
+        <ksession name="basicKsession" clockType="pseudo" />
+    </kbase>
 </kmodule>

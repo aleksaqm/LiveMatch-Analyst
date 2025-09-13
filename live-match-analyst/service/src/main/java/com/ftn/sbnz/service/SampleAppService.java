@@ -1,5 +1,7 @@
 package com.ftn.sbnz.service;
 
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.models.CommentaryLine;
 import com.ftn.sbnz.model.models.User;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
@@ -39,4 +41,13 @@ public class SampleAppService {
 		kieSession.dispose();
 		return user;
 	}
+
+	public void resolveGameEvent(GameEvent gameEvent) {
+		KieSession kieSession = kieContainer.newKieSession("basicKsession");
+		kieSession.insert(gameEvent);
+		kieSession.fireAllRules();
+		kieSession.dispose();
+//		return ;
+	}
+
 }
