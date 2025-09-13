@@ -1,0 +1,54 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+*.lock
+
+# Spring Boot
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/**/target/
+!**/target/*.jar
+!**/target/*.war
+!**/target/*.ear
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Drools specific generated files
+# If Drools generates files that you don't want to commit, add them here.
+# For example, if you have specific output directories for generated rules or models.
+# /generated-sources/
+# /src/main/resources/META-INF/kmodule.xml.generated
