@@ -1,5 +1,6 @@
 package com.ftn.sbnz.service;
 
+import com.ftn.sbnz.model.models.User;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 import org.slf4j.Logger;
@@ -29,5 +30,13 @@ public class SampleAppService {
 		kieSession.fireAllRules();
 		kieSession.dispose();
 		return i;
+	}
+
+	public User classifyUser(User user) {
+		KieSession kieSession = kieContainer.newKieSession("cepKsession");
+		kieSession.insert(user);
+		kieSession.fireAllRules();
+		kieSession.dispose();
+		return user;
 	}
 }

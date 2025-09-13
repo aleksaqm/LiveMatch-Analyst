@@ -1,10 +1,10 @@
-package cep;
+package backward
 
 import com.ftn.sbnz.model.models.User;
 
-rule "Coki is King"
+rule "Aleksa is King"
     when
-        $u : User(name == "Coki")
+        $u : User(name == "Aleksa")
     then
         $u.setStatus("King");
         System.out.println($u.getName() + " is King!");

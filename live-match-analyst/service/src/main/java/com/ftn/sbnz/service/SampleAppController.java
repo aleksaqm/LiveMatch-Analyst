@@ -1,5 +1,6 @@
 package com.ftn.sbnz.service;
 
+import com.ftn.sbnz.model.models.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,14 @@ public class SampleAppController {
 
 		return i2;
 	}
+
+	@RequestMapping(value = "/user", method = RequestMethod.GET, produces = "application/json")
+	public User classifyUser(@RequestParam String name, @RequestParam int age) {
+		User user = new User(name, age);
+        return sampleService.classifyUser(user);
+	}
+
+
 	
 	
 	
