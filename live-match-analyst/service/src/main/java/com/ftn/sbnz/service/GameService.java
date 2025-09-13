@@ -14,35 +14,37 @@ public class GameService {
 
     private final KieContainer kieContainer;
 
+    // In-memory podaci
+    private List<Player> players = new ArrayList<>();
+    private List<Team> teams = new ArrayList<>();
+    private List<PlayerStats> stats = new ArrayList<>();
+
     public GameService(KieContainer kieContainer) {
         this.kieContainer = kieContainer;
     }
 
-    public List<CommentaryLine> processEvents(List<GameEvent> events, List<Player> players, List<Team> teams, List<PlayerStats> stats) {
+    public void startGame(List<Player> players, List<Team> teams, List<PlayerStats> stats) {
+        this.players = new ArrayList<>(players);
+        this.teams = new ArrayList<>(teams);
+        this.stats = new ArrayList<>(stats);
+    }
+
+    public List<CommentaryLine> processSingleEvent(GameEvent event) {
         KieSession kieSession = kieContainer.newKieSession("basicKsession");
         for (Player player : players) kieSession.insert(player);
         for (Team team : teams) kieSession.insert(team);
         for (PlayerStats stat : stats) kieSession.insert(stat);
 
-        List<CommentaryLine> allComments = new ArrayList<>();
-        for (GameEvent event : events) {
-            kieSession.insert(event);
-            kieSession.fireAllRules();
+        kieSession.insert(event);
+        kieSession.fireAllRules();
 
-            List<CommentaryLine> comments = new ArrayList<>();
-            for (Object obj : kieSession.getObjects()) {
-                if (obj instanceof CommentaryLine) {
-                    comments.add((CommentaryLine) obj);
-                }
-            }
-            allComments.addAll(comments);
-
-            for (CommentaryLine cl : comments) {
-                kieSession.delete(kieSession.getFactHandle(cl));
+        List<CommentaryLine> comments = new ArrayList<>();
+        for (Object obj : kieSession.getObjects()) {
+            if (obj instanceof CommentaryLine) {
+                comments.add((CommentaryLine) obj);
             }
         }
         kieSession.dispose();
-        return allComments;
+        return comments;
     }
-
 }
