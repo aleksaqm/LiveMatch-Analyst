@@ -1,11 +1,1 @@
 package cep;
-
-import com.ftn.sbnz.model.models.User;
-
-rule "Coki is King"
-    when
-        $u : User(name == "Coki")
-    then
-        $u.setStatus("King");
-        System.out.println($u.getName() + " is King!");
-end

@@ -1,19 +1,1 @@
 package backward;
-
-import com.ftn.sbnz.model.models.User;
-
-rule "Classify user as old"
-    when
-        $u : User(age > 30)
-    then
-        $u.setStatus("old");
-        System.out.println($u.getName() + " is old!");
-end
-
-rule "Classify user as young"
-    when
-        $u : User(age <= 30)
-    then
-        $u.setStatus("young");
-        System.out.println($u.getName() + " is young!");
-end

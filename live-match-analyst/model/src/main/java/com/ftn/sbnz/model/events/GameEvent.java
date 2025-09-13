@@ -1,8 +1,12 @@
 package com.ftn.sbnz.model.events;
 
+import org.kie.api.definition.type.Expires;
+import org.kie.api.definition.type.Role;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 
+@Role(Role.Type.EVENT)
 public class GameEvent {
     public enum EventType {
         SHOT_MADE, SHOT_MISSED, REBOUND, ASSIST, STEAL, BLOCK, TURNOVER, FOUL

@@ -7,6 +7,6 @@
         <ksession name="cepKsession" clockType="pseudo" />
     </kbase>
     <kbase name="basicKbase" eventProcessingMode="stream" packages="basicrules">
-        <ksession name="basicKsession" clockType="pseudo" />
+        <ksession name="basicKsession" clockType="realtime"/>
     </kbase>
 </kmodule>
