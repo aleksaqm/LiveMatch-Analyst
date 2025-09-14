@@ -4,7 +4,6 @@ import org.kie.api.definition.type.Role;
 
 
 @Role(Role.Type.FACT)
-@Expires("5s")
 public class CommentaryLine {
     public enum Importance { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Type { PLAY_BY_PLAY, ANALYSIS, STATISTIC, HIGHLIGHT }
