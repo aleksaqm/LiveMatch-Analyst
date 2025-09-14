@@ -25,12 +25,14 @@ public class GameService {
         for (Player player : players) this.kieSession.insert(player);
         for (Team team : teams) this.kieSession.insert(team);
         for (PlayerStats stat : stats) this.kieSession.insert(stat);
+
+        new Thread(() -> this.kieSession.fireUntilHalt()).start();
     }
 
-    public List<CommentaryLine> processSingleEvent(GameEvent event) {
+    public List<CommentaryLine> processSingleEvent(GameEvent event) throws InterruptedException {
         try{
             this.kieSession.insert(event);
-            this.kieSession.fireAllRules();
+            // this.kieSession.fireAllRules();
         }catch (Exception e){
             return new ArrayList<>();
         }
@@ -45,6 +47,8 @@ public class GameService {
                 commentHandlesToDelete.add(handle);
             }
         }
+
+        Thread.sleep(1000);
 
         for (FactHandle handle : commentHandlesToDelete) {
             kieSession.delete(handle);
@@ -61,6 +65,7 @@ public class GameService {
 
     public String endgame(){
         try {
+            this.kieSession.halt();
             this.kieSession.dispose();
             return "Ended game successfully";
         }catch (Exception e){
