@@ -46,6 +46,9 @@ public class GameService {
                 comments.add((CommentaryLine) obj);
                 commentHandlesToDelete.add(handle);
             }
+            if (obj instanceof PlayerStats){
+                System.out.println(((PlayerStats) obj).getThreePointersMade());
+            }
         }
 
         Thread.sleep(1000);
