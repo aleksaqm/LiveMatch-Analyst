@@ -28,7 +28,7 @@ public class RuleTestController {
     }
 
     @PostMapping("/event")
-    public List<CommentaryLine> processEvent(@RequestBody GameEvent event) {
+    public List<CommentaryLine> processEvent(@RequestBody GameEvent event) throws InterruptedException {
         return gameService.processSingleEvent(event);
     }
 
