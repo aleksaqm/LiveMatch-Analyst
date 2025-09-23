@@ -9,7 +9,6 @@ import com.ftn.sbnz.model.models.CommentaryLine;
 import com.ftn.sbnz.model.models.CommentaryLine.Importance;
 import com.ftn.sbnz.model.models.CommentaryLine.Type;
 
-// Pravilo 1: Trojka
 rule "ThreePointerComment"
 when
     $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
@@ -24,7 +23,6 @@ then
     insert(new CommentaryLine("Trojka! Igrač " + $playerName + " iz tima " + $teamName + " je pogodio trojku!", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
-// Pravilo 2: Šesta trojka
 rule "SixthThreePointerComment"
 when
     $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
@@ -35,7 +33,6 @@ then
     insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
 end
 
-// Pravilo 3: Prilika za kontru
 rule "FastbreakOpportunityComment"
 when
     $event: GameEvent(eventType == EventType.TURNOVER, $teamId: teamId)
