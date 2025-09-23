@@ -49,7 +49,6 @@ then
     insert(new CommentaryLine("Prilika za brzu kontru za tim " + $opponentName + "!", Importance.MEDIUM, Type.ANALYSIS));
 end
 
-// Pravilo 4: Detekcija defanzivne dominacije (Defensive Stop Streak) - Fixed with proper CEP
 rule "DefensiveStopStreakComment"
 salience 100  
 when
@@ -58,7 +57,7 @@ when
         GameEvent(
             (eventType == EventType.SHOT_MISSED || eventType == EventType.TURNOVER),
             teamId == $teamId
-        ) over window:time(20s),
+        ) over window:time(2m),
         count(1)
     )
     not (GameEvent(eventType == EventType.SHOT_MADE, teamId == $teamId) over window:time(20s))
@@ -66,3 +65,29 @@ when
 then
     insert(new CommentaryLine("Odlična defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspešnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
 end
+
+
+rule "ScoringRunComment"
+when
+    $team: Team($teamId: id, $teamName: name)
+    $run: Number(intValue >= 8) from accumulate (
+        GameEvent(
+            eventType == EventType.SHOT_MADE,
+            teamId == $teamId,
+            $points: details['points']
+        ) over window:time(2m),
+        sum($points)
+    )
+    not (GameEvent(
+        eventType == EventType.SHOT_MADE,
+        teamId != $teamId
+    ) over window:time(2m))
+    $opposingTeam: Team(id != $teamId, $opposingTeamName: name)
+then
+    insert(new CommentaryLine(
+        "Kakva serija tima " + $teamName + "! Rezultat je " + $run.intValue() + "-0 u poslednja dva minuta!",
+        Importance.HIGH,
+        Type.ANALYSIS
+    ));
+end
+
