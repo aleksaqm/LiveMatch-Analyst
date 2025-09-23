@@ -20,16 +20,23 @@ then
         setThreePointersMade($stats.getThreePointersMade() + 1),
         setPoints($stats.getPoints() + 3)
     }
+    modify($event){
+        setProcessed($stats.getThreePointersMade() < 6)
+    }
+
     insert(new CommentaryLine("Trojka! Igrač " + $playerName + " iz tima " + $teamName + " je pogodio trojku!", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "SixthThreePointerComment"
 when
-    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, processed == false, $playerId: playerId, $teamId: teamId)
     $stats: PlayerStats(playerId == $playerId, threePointersMade >= 6)
     $player: Player(id == $playerId, $playerName: name)
     $team: Team(id == $teamId, $teamName: name)
 then
+    modify($event){
+        setProcessed(true)
+    }
     insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
 end
 
@@ -40,4 +47,22 @@ when
     $opponent: Team(id != $teamId, $opponentName: name)
 then
     insert(new CommentaryLine("Prilika za brzu kontru za tim " + $opponentName + "!", Importance.MEDIUM, Type.ANALYSIS));
+end
+
+// Pravilo 4: Detekcija defanzivne dominacije (Defensive Stop Streak) - Fixed with proper CEP
+rule "DefensiveStopStreakComment"
+salience 100  
+when
+    $team: Team($teamId: id, $stoppedTeamName: name)
+    $stops: Number(intValue >= 6) from accumulate (
+        GameEvent(
+            (eventType == EventType.SHOT_MISSED || eventType == EventType.TURNOVER),
+            teamId == $teamId
+        ) over window:time(20s),
+        count(1)
+    )
+    not (GameEvent(eventType == EventType.SHOT_MADE, teamId == $teamId) over window:time(20s))
+    $defendingTeam: Team(id != $teamId, $defendingTeamName: name)
+then
+    insert(new CommentaryLine("Odlična defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspešnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
 end

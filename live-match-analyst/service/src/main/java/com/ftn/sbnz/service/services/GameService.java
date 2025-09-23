@@ -29,9 +29,19 @@ public class GameService {
 
     public List<CommentaryLine> processSingleEvent(GameEvent event) {
         try{
+            if (event.getTimestamp() == 0) {
+                event.setTimestamp(System.currentTimeMillis());
+            }
+            
             this.kieSession.insert(event);
-            this.kieSession.fireAllRules();
+            
+            for (FactHandle handle : kieSession.getFactHandles()) {
+                Object obj = kieSession.getObject(handle);
+            }
+            
+            int rulesFired = this.kieSession.fireAllRules();
         }catch (Exception e){
+            e.printStackTrace();
             return new ArrayList<>();
         }
 
@@ -50,12 +60,12 @@ public class GameService {
             kieSession.delete(handle);
         }
 
-        for (FactHandle handle : kieSession.getFactHandles()) {
-            Object obj = kieSession.getObject(handle);
-            if (obj instanceof GameEvent) {
-                kieSession.delete(handle);
-            }
-        }
+//        for (FactHandle handle : kieSession.getFactHandles()) {
+//            Object obj = kieSession.getObject(handle);
+//            if (obj instanceof GameEvent) {
+//                kieSession.delete(handle);
+//            }
+//        }
         return comments;
     }
 
