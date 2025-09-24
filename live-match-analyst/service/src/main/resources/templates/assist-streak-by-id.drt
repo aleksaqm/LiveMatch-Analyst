@@ -1,0 +1,33 @@
+template header
+playerId
+assistCount
+timeWindowMinutes
+commentText
+importance
+
+package com.ftn.sbnz.kjar.templates;
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.models.CommentaryLine;
+
+template "assist_streak_by_player_id_template"
+
+rule "Assist_Streak_By_Player_ID_@{row.rowNumber}"
+    when
+        accumulate (
+            GameEvent(
+                eventType == GameEvent.EventType.ASSIST,
+                playerId == @{playerId}L
+            ) over window:time(@{timeWindowMinutes}m),
+            $count: count(1)
+        )
+        eval($count >= @{assistCount})
+    then
+        insert(new CommentaryLine(
+            "@{commentText}",
+            CommentaryLine.Importance.valueOf("@{importance}"),
+            CommentaryLine.Type.ANALYSIS
+        ));
+        System.out.println("Template rule triggered: Player with ID @{playerId} made " + $count + " assists in @{timeWindowMinutes} minutes!");
+end
+
+end template

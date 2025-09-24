@@ -1,5 +1,8 @@
 package com.ftn.sbnz.service.controller;
 
+import com.ftn.sbnz.model.dto.AssistStreakByIdTemplateDto;
+import com.ftn.sbnz.model.dto.ScoringStreakTemplateDto;
+import com.ftn.sbnz.model.dto.RuleTemplateDto;
 import com.ftn.sbnz.model.dto.StartGameDto;
 import com.ftn.sbnz.model.events.GameEvent;
 import com.ftn.sbnz.model.models.*;
@@ -35,5 +38,16 @@ public class RuleTestController {
     @PostMapping("/endgame")
     public String endGame() {
         return gameService.endgame();
+    }
+
+    
+    @PostMapping("/templates/register/assist-streak-by-id")
+    public String registerAssistStreakByIdTemplate(@RequestBody AssistStreakByIdTemplateDto templateData) {
+        return gameService.addTemplateRule("assist-streak-by-id", templateData);
+    }
+    
+    @PostMapping("/templates/register/scoring-streak")
+    public String registerScoringStreakTemplate(@RequestBody ScoringStreakTemplateDto templateData) {
+        return gameService.addTemplateRule("scoring-streak", templateData);
     }
 }
