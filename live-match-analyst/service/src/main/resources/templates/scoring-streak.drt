@@ -1,0 +1,39 @@
+template header
+playerId
+shotCount
+timeWindowMinutes
+commentText
+importance
+
+package com.ftn.sbnz.kjar.templates;
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.models.CommentaryLine;
+
+template "scoring_streak_template"
+
+rule "Scoring_Streak_@{row.rowNumber}"
+    when
+        accumulate (
+            GameEvent(
+                eventType == GameEvent.EventType.SHOT_MADE,
+                playerId == @{playerId}L
+            ) over window:time(@{timeWindowMinutes}m),
+            $count: count(1)
+        )
+        eval($count >= @{shotCount})
+        not (
+            GameEvent(
+                eventType == GameEvent.EventType.SHOT_MISSED,
+                playerId == @{playerId}L
+            ) over window:time(@{timeWindowMinutes}m)
+        )
+    then
+        insert(new CommentaryLine(
+            "@{commentText}",
+            CommentaryLine.Importance.valueOf("@{importance}"),
+            CommentaryLine.Type.HIGHLIGHT
+        ));
+        System.out.println("Template rule triggered: Player @{playerId} made " + $count + " consecutive shots!");
+end
+
+end template
