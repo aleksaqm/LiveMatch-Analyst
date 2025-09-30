@@ -8,26 +8,31 @@ importance
 package com.ftn.sbnz.kjar.templates;
 import com.ftn.sbnz.model.events.GameEvent;
 import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.Player;
+import com.ftn.sbnz.model.models.PlayerStats;
 
 template "assist_streak_by_player_id_template"
 
 rule "Assist_Streak_By_Player_ID_@{row.rowNumber}"
     when
+        $player: Player(id == @{playerId}L)
+        $stats: PlayerStats(playerId == @{playerId}L)
         accumulate (
             GameEvent(
                 eventType == GameEvent.EventType.ASSIST,
                 playerId == @{playerId}L
             ) over window:time(@{timeWindowMinutes}m),
-            $count: count(1)
+            $streakCount: count(1)
         )
-        eval($count >= @{assistCount})
+        eval($streakCount >= @{assistCount})
     then
+        String dynamicComment = "@{commentText}" + " " + $player.getName() + " ima " + $streakCount + " asistencija za redom i  " + ($stats.getAssists() + 1) + " ukupno asistencija!";
         insert(new CommentaryLine(
-            "@{commentText}",
+            dynamicComment,
             CommentaryLine.Importance.valueOf("@{importance}"),
             CommentaryLine.Type.ANALYSIS
         ));
-        System.out.println("Template rule triggered: Player with ID @{playerId} made " + $count + " assists in @{timeWindowMinutes} minutes!");
+        System.out.println("Template rule triggered: " + $player.getName() + " (ID: @{playerId}) made " + $streakCount + " assists in @{timeWindowMinutes} minutes!");
 end
 
 end template
