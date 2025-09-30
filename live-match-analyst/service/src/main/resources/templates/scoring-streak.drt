@@ -8,19 +8,23 @@ importance
 package com.ftn.sbnz.kjar.templates;
 import com.ftn.sbnz.model.events.GameEvent;
 import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.Player;
+import com.ftn.sbnz.model.models.PlayerStats;
 
 template "scoring_streak_template"
 
 rule "Scoring_Streak_@{row.rowNumber}"
     when
+        $player: Player(id == @{playerId}L)
+        $stats: PlayerStats(playerId == @{playerId}L)
         accumulate (
             GameEvent(
                 eventType == GameEvent.EventType.SHOT_MADE,
                 playerId == @{playerId}L
             ) over window:time(@{timeWindowMinutes}m),
-            $count: count(1)
+            $streakCount: count(1)
         )
-        eval($count >= @{shotCount})
+        eval($streakCount >= @{shotCount})
         not (
             GameEvent(
                 eventType == GameEvent.EventType.SHOT_MISSED,
@@ -28,12 +32,13 @@ rule "Scoring_Streak_@{row.rowNumber}"
             ) over window:time(@{timeWindowMinutes}m)
         )
     then
+        String dynamicComment = "@{commentText}" + " " + $player.getName() + " dao " + $streakCount + " šuteva za redom  i sada ima ukupno " + $stats.getPoints() + " poena !";
         insert(new CommentaryLine(
-            "@{commentText}",
+            dynamicComment,
             CommentaryLine.Importance.valueOf("@{importance}"),
             CommentaryLine.Type.HIGHLIGHT
         ));
-        System.out.println("Template rule triggered: Player @{playerId} made " + $count + " consecutive shots!");
+        System.out.println("Template rule triggered: " + $player.getName() + " (ID: @{playerId}) made " + $streakCount + " consecutive shots!");
 end
 
 end template
