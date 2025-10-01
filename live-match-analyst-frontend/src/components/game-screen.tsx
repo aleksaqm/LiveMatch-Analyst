@@ -2,22 +2,16 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import type { Team } from "@/page";
 import { EventPanel } from "@/components/event-panel";
 import { CommentaryFeed } from "@/components/commentary-feed";
 import { EventsList } from "@/components/events-list";
-import { RuleTemplatePanel } from "@/components/rule-template-panel";
 import {
   sendGameEvent,
   endGame as apiEndGame,
-  startGame,
   type GameEvent,
   type CommentaryLine,
-  type StartGameDto,
-  type Player as BackendPlayer,
-  type Team as BackendTeam,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,66 +29,18 @@ export function GameScreen({
   teamA,
   teamB,
   onEndGame,
+  onShowRules,
 }: {
   teamA: Team;
   teamB: Team;
   onEndGame: () => void;
+  onShowRules: () => void;
 }) {
   const [events, setEvents] = useState<GameEventWithId[]>([]);
   const [commentaries, setCommentaries] = useState<Commentary[]>([]);
-  // Game is always started when this component is rendered
-  const [isConnected] = useState(true); // HTTP is always "connected"
   const { toast } = useToast();
 
-  // Initialize game on component mount
-  useEffect(() => {
-    const initializeGame = async () => {
-      // Convert frontend teams/players to backend format
-      const backendPlayers: BackendPlayer[] = [];
-      const backendTeams: BackendTeam[] = [
-        { id: teamA.id, name: teamA.name },
-        { id: teamB.id, name: teamB.name },
-      ];
-
-      // Add players with proper teamId
-      teamA.players.forEach((player) => {
-        backendPlayers.push({
-          id: player.id,
-          name: player.name,
-          teamId: teamA.id,
-        });
-      });
-
-      teamB.players.forEach((player) => {
-        backendPlayers.push({
-          id: player.id,
-          name: player.name,
-          teamId: teamB.id,
-        });
-      });
-
-      const gameData: StartGameDto = {
-        players: backendPlayers,
-        teams: backendTeams,
-      };
-
-      const result = await startGame(gameData);
-      if (result.success) {
-        toast({
-          title: "Igra je počela",
-          description: "Uspešno povezano sa serverom.",
-        });
-      } else {
-        toast({
-          title: "Greška pri pokretanju igre",
-          description: result.error || "Pokušajte ponovo.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    initializeGame();
-  }, [teamA, teamB, toast]);
+  // Game is already initialized by parent component
 
   const handleEventSent = useCallback(
     async (event: GameEventWithId) => {
@@ -166,22 +112,14 @@ export function GameScreen({
             <h1 className="text-2xl font-bold tracking-tight">
               ZAPISNIČKI STO
             </h1>
-            <Badge
-              variant={isConnected ? "default" : "secondary"}
-              className="flex items-center gap-1"
+            <Button
+              variant="outline"
+              onClick={onShowRules}
+              className="flex items-center gap-2"
             >
-              {isConnected ? (
-                <>
-                  <Wifi className="h-3 w-3" />
-                  Povezano
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3 w-3" />
-                  Nepovezano
-                </>
-              )}
-            </Badge>
+              <FileText className="h-4 w-4" />
+              Šabloni pravila
+            </Button>
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-8">
@@ -199,7 +137,7 @@ export function GameScreen({
       </header>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
             <EventPanel
               teamA={teamA}
@@ -219,10 +157,6 @@ export function GameScreen({
 
           <div>
             <CommentaryFeed commentaries={commentaries} />
-          </div>
-
-          <div>
-            <RuleTemplatePanel teamA={teamA} teamB={teamB} />
           </div>
         </div>
       </div>

@@ -26,7 +26,7 @@ rule "Assist_Streak_By_Player_ID_@{row.rowNumber}"
         )
         eval($streakCount >= @{assistCount})
     then
-        String dynamicComment = "@{commentText}" + " " + $player.getName() + " ima " + $streakCount + " asistencija za redom i  " + ($stats.getAssists() + 1) + " ukupno asistencija!";
+        String dynamicComment = "@{commentText}" + " " + $player.getName() + " ima " + $streakCount + " asistencija za redom i  " + ($stats.getAssists()) + " ukupno asistencija!";
         insert(new CommentaryLine(
             dynamicComment,
             CommentaryLine.Importance.valueOf("@{importance}"),
