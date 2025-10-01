@@ -9,7 +9,156 @@ import com.ftn.sbnz.model.models.CommentaryLine;
 import com.ftn.sbnz.model.models.CommentaryLine.Importance;
 import com.ftn.sbnz.model.models.CommentaryLine.Type;
 
-rule "ThreePointerComment"
+rule "FreeThrowMadeComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 1, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setFreeThrowsMade($stats.getFreeThrowsMade() + 1),
+        setFreeThrowAttempted($stats.getFreeThrowAttempted() + 1),
+        setPoints($stats.getPoints() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Slobodno bacanje! " + $playerName + " iz tima " + $teamName + " je pogodio slobodno bacanje!", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "FreeThrowMissedComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MISSED, details["points"] == 1, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setFreeThrowAttempted($stats.getFreeThrowAttempted() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio slobodno bacanje.", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "FieldGoalMadeComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 2, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setFieldGoalsMade($stats.getFieldGoalsMade() + 1),
+        setFieldGoals($stats.getFieldGoals() + 1),
+        setPoints($stats.getPoints() + 2)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+
+    String shotTypeText = "šut";
+    if ($event.getDetails().containsKey("shotType")) {
+        shotTypeText = (String) $event.getDetails().get("shotType");
+    }
+    insert(new CommentaryLine("Pogodak! " + $playerName + " iz tima " + $teamName + " je pogodio " + shotTypeText + " za 2 poena!", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "FieldGoalMissedComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MISSED, details["points"] == 2, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setFieldGoals($stats.getFieldGoals() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    String shotTypeText = "šut";
+    if ($event.getDetails().containsKey("shotType")) {
+        shotTypeText = (String) $event.getDetails().get("shotType");
+    }
+    
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio " + shotTypeText + " za 2.", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "ReboundComment"
+when
+    $event: GameEvent(eventType == EventType.REBOUND, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setRebounds($stats.getRebounds() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Skok! " + $playerName + " iz tima " + $teamName + " je uhvatio skok! To mu je " + ($stats.getRebounds()) + ". skok u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "StealComment"
+when
+    $event: GameEvent(eventType == EventType.STEAL, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setSteals($stats.getSteals() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Ukradena lopta! " + $playerName + " iz tima " + $teamName + " je ukrao loptu! To mu je " + ($stats.getSteals()) + ". ukradena na meču.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+end
+
+rule "BlockComment"
+when
+    $event: GameEvent(eventType == EventType.BLOCK, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setBlocks($stats.getBlocks() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Rampa! " + $playerName + " iz tima " + $teamName + " je blokirao šut! To mu je " + ($stats.getBlocks()) + ". blokada na meču.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+end
+
+rule "TurnoverComment"
+when
+    $event: GameEvent(eventType == EventType.TURNOVER, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setTurnovers($stats.getTurnovers() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Greška! " + $playerName + " iz tima " + $teamName + " je izgubio loptu.", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "ThreePointerMadeComment"
 when
     $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, $playerId: playerId, $teamId: teamId)
     $player: Player(id == $playerId, $playerName: name)
@@ -18,77 +167,31 @@ when
 then
     modify($stats){
         setThreePointersMade($stats.getThreePointersMade() + 1),
+        setThreePointersAttempted($stats.getThreePointersAttempted() + 1),
         setPoints($stats.getPoints() + 3)
     }
     modify($event){
-        setProcessed($stats.getThreePointersMade() < 6)
+        setProcessed(true)
     }
-
-    insert(new CommentaryLine("Trojka! Igrač " + $playerName + " iz tima " + $teamName + " je pogodio trojku!", Importance.LOW, Type.PLAY_BY_PLAY));
+    
+    insert(new CommentaryLine("Trojka! " + $playerName + " iz tima " + $teamName + " je pogodio trojku!", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
-rule "SixthThreePointerComment"
+rule "ThreePointerMissedComment"
 when
-    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, processed == false, $playerId: playerId, $teamId: teamId)
-    $stats: PlayerStats(playerId == $playerId, threePointersMade >= 6)
+    $event: GameEvent(eventType == EventType.SHOT_MISSED, details["points"] == 3, $playerId: playerId, $teamId: teamId)
     $player: Player(id == $playerId, $playerName: name)
     $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
 then
+    modify($stats){
+        setThreePointersAttempted($stats.getThreePointersAttempted() + 1)
+    }
     modify($event){
         setProcessed(true)
     }
-    insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
-end
-
-rule "FastbreakOpportunityComment"
-when
-    $event: GameEvent(eventType == EventType.TURNOVER, $teamId: teamId)
-    $team: Team(id == $teamId)
-    $opponent: Team(id != $teamId, $opponentName: name)
-then
-    insert(new CommentaryLine("Prilika za brzu kontru za tim " + $opponentName + "!", Importance.MEDIUM, Type.ANALYSIS));
-end
-
-rule "DefensiveStopStreakComment"
-salience 100  
-when
-    $team: Team($teamId: id, $stoppedTeamName: name)
-    $stops: Number(intValue >= 6) from accumulate (
-        GameEvent(
-            (eventType == EventType.SHOT_MISSED || eventType == EventType.TURNOVER),
-            teamId == $teamId
-        ) over window:time(2m),
-        count(1)
-    )
-    not (GameEvent(eventType == EventType.SHOT_MADE, teamId == $teamId) over window:time(1m))
-    $defendingTeam: Team(id != $teamId, $defendingTeamName: name)
-then
-    insert(new CommentaryLine("Odlična defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspešnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
-end
-
-
-rule "ScoringRunComment"
-when
-    $team: Team($teamId: id, $teamName: name)
-    $run: Number(intValue >= 8) from accumulate (
-        GameEvent(
-            eventType == EventType.SHOT_MADE,
-            teamId == $teamId,
-            $points: details['points']
-        ) over window:time(2m),
-        sum($points)
-    )
-    not (GameEvent(
-        eventType == EventType.SHOT_MADE,
-        teamId != $teamId
-    ) over window:time(2m))
-    $opposingTeam: Team(id != $teamId, $opposingTeamName: name)
-then
-    insert(new CommentaryLine(
-        "Kakva serija tima " + $teamName + "! Rezultat je " + $run.intValue() + "-0 u poslednja dva minuta!",
-        Importance.HIGH,
-        Type.ANALYSIS
-    ));
+    
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio trojku.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "AssistComment"
@@ -105,6 +208,22 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists() + 1) + ". asistencija u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists()) + ". asistencija u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
+rule "FoulComment"
+when
+    $event: GameEvent(eventType == EventType.FOUL, $playerId: playerId, $teamId: teamId)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    $stats: PlayerStats(playerId == $playerId)
+then
+    modify($stats){
+        setFouls($stats.getFouls() + 1)
+    }
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Faul! " + $playerName + " iz tima " + $teamName + " je napravio faul. To mu je " + ($stats.getFouls()) + ". faul u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+end

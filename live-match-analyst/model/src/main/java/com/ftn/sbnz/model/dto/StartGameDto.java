@@ -9,5 +9,5 @@ import java.util.List;
 public class StartGameDto {
     public List<Player> players;
     public List<Team> teams;
-    public List<PlayerStats> stats;
+//    public List<PlayerStats> stats;
 }

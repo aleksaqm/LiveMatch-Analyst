@@ -25,8 +25,8 @@ public class RuleTestController {
     public void startGame(@RequestBody StartGameDto startGameData) {
         gameService.startGame(
                 startGameData.players,
-                startGameData.teams,
-                startGameData.stats
+                startGameData.teams
+//                startGameData.stats
         );
     }
 

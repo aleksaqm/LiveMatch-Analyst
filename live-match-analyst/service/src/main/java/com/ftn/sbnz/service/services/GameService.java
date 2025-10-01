@@ -31,12 +31,16 @@ public class GameService {
         this.registeredTemplateRules = new ArrayList<>();
     }
 
-    public void startGame(List<Player> players, List<Team> teams, List<PlayerStats> stats) {
+    public void startGame(List<Player> players, List<Team> teams) {
         // Initialize original session for DRL rules
         this.originalKieSession = kieContainer.newKieSession("basicKsession");
-        for (Player player : players) this.originalKieSession.insert(player);
+        for (Player player : players) {
+            this.originalKieSession.insert(player);
+            PlayerStats playerStats = new PlayerStats(player.getId(), player.getTeamId());
+            this.originalKieSession.insert(playerStats);
+        };
         for (Team team : teams) this.originalKieSession.insert(team);
-        for (PlayerStats stat : stats) this.originalKieSession.insert(stat);
+//        for (PlayerStats stat : stats) this.originalKieSession.insert(stat);
         
         // Template session will be created when first template is registered
         this.templateKieSession = null;
