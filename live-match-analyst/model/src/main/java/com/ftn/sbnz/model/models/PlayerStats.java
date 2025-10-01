@@ -15,6 +15,7 @@ public class PlayerStats {
     private int freeThrowsMade = 0;
     private int freeThrowAttempted = 0;
     private int threePointersMade = 0;
+    private int threePointersAttempted = 0;
 
     public PlayerStats() {}
     public PlayerStats(Long playerId, Long teamId, int points, int assists, int threePointersMade) {
@@ -39,6 +40,8 @@ public class PlayerStats {
     public void setAssists(int assists) { this.assists = assists; }
     public int getThreePointersMade() { return threePointersMade; }
     public void setThreePointersMade(int threePointersMade) { this.threePointersMade = threePointersMade; }
+    public int getThreePointersAttempted() { return threePointersAttempted; }
+    public void setThreePointersAttempted(int threePointersAttempted) {this.threePointersAttempted = threePointersAttempted; }
     public int getFreeThrowsMade() { return freeThrowsMade; }
     public void setFreeThrowsMade(int freeThrowsMade) {this.freeThrowsMade = freeThrowsMade; }
     public int getFreeThrowAttempted() { return freeThrowAttempted; }
