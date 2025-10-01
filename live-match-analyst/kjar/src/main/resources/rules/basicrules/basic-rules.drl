@@ -105,6 +105,6 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists() + 1) + ". asistencija u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists()) + ". asistencija u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
