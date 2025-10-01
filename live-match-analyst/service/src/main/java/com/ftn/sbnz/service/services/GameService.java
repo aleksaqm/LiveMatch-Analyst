@@ -105,6 +105,15 @@ public class GameService {
     
     private GameEvent copyEvent(GameEvent original) {
         GameEvent copy = new GameEvent();
+        if(original.getDetails() != null){
+            if (original.getDetails().containsKey("receiverId")) {
+                Number receiverId = (Number) original.getDetails().get("receiverId");
+                if (receiverId != null) {
+                    original.getDetails().put("receiverId", receiverId.longValue());
+                }
+            }
+        }
+
         copy.setPlayerId(original.getPlayerId());
         copy.setTeamId(original.getTeamId());
         copy.setEventType(original.getEventType());

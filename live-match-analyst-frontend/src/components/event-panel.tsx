@@ -61,10 +61,12 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const [points, setPoints] = useState<string>("");
   const [shotType, setShotType] = useState<string>("");
+  const [receiverId, setReceiverId] = useState<string>("");
 
   const requiresPlayer = eventType && PLAYER_EVENTS.includes(eventType);
   const requiresShot = eventType && SHOT_EVENTS.includes(eventType);
-
+  const isAssist = eventType === "ASSIST";
+  
   const currentTeam =
     selectedTeam === "A" ? teamA : selectedTeam === "B" ? teamB : null;
 
@@ -98,6 +100,12 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
       details = {
         points: Number.parseInt(points),
         shotType,
+      };
+    }
+
+    if (isAssist && receiverId) {
+      details = {
+        receiverId: Number.parseInt(receiverId)
       };
     }
 
@@ -180,6 +188,24 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
           <div className="space-y-2">
             <Label htmlFor="player">Igrač</Label>
             <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
+              <SelectTrigger id="player" className="bg-secondary">
+                <SelectValue placeholder="Izaberite igrača" />
+              </SelectTrigger>
+              <SelectContent>
+                {currentTeam.players.map((player) => (
+                  <SelectItem key={player.id} value={player.id.toString()}>
+                    {player.name} (#{player.number || player.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+         {isAssist && selectedTeam && currentTeam && (
+          <div className="space-y-2">
+            <Label htmlFor="player">Asistira za</Label>
+            <Select value={receiverId} onValueChange={setReceiverId}>
               <SelectTrigger id="player" className="bg-secondary">
                 <SelectValue placeholder="Izaberite igrača" />
               </SelectTrigger>

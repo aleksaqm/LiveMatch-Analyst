@@ -8,8 +8,8 @@ import com.ftn.sbnz.model.models.Team;
 import com.ftn.sbnz.model.models.CommentaryLine;
 import com.ftn.sbnz.model.models.CommentaryLine.Importance;
 import com.ftn.sbnz.model.models.CommentaryLine.Type;
-
-
+import com.ftn.sbnz.model.models.PlaySequence;
+dialect  "mvel"
 
 rule "SixthThreePointerComment"
 when
@@ -72,5 +72,446 @@ then
     ));
 end
 
+declare AssistChain
+    scorerId: Long
+    teamId: Long
+    initiatorId: Long
+    assistCount: int
+    traced: boolean
+    timestamp: long
+end
+
+rule "StartChain"
+salience 100
+when
+    $shot: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        (details["points"] == 2 || details["points"] == 3),
+        $scorerId: playerId,
+        $teamId: teamId,
+        $time: timestamp
+    )
+    not AssistChain(scorerId == $scorerId, timestamp == $time)
+then
+    System.out.println("[1] Koš! Igrač " + $scorerId + " @ " + $time);
+
+    AssistChain chain = new AssistChain();
+    chain.setScorerId($scorerId);
+    chain.setTeamId($teamId);
+    chain.setAssistCount(0);
+    chain.setTraced(false);
+    chain.setTimestamp($time);
+    insert(chain);
+end
 
 
+rule "FindAssistToScorer"
+salience 90
+when
+    $chain: AssistChain(
+        traced == false,
+        assistCount == 0,
+        $scorerId: scorerId,
+        $teamId: teamId,
+        $time: timestamp
+    )
+    $assist: GameEvent(
+        eventType == EventType.ASSIST,
+        details["receiverId"] == $scorerId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 15000),
+        processed == true,
+        $assisterId: playerId
+    )
+then
+    System.out.println("[2] Pronađena asistencija: " + $assisterId + " -> " + $scorerId);
+    modify($chain) {
+        setInitiatorId($assisterId),
+        setAssistCount(1)
+    }
+end
+
+rule "TraceBackFurther"
+salience 80
+when
+    $chain: AssistChain(
+        traced == false,
+        assistCount > 0,
+        assistCount < 4,  // Max 4 dodavanja
+        $currentInitiator: initiatorId,
+        $teamId: teamId,
+        $time: timestamp
+    )
+    $assist: GameEvent(
+        eventType == EventType.ASSIST,
+        details["receiverId"] == $currentInitiator,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 15000),
+        processed == true,
+        $previousAssister: playerId,
+        $a: details["receiverId"]
+    )
+then
+    System.out.println("[3] Dodatna asistencija: " + $previousAssister + " -> " + $currentInitiator);
+    System.out.println("Tip scorerId1: " + $a);
+    System.out.println("Tip scorerId1: " + $a.getClass().getName());
+    System.out.println("Tip scorerId2: " + $currentInitiator);
+    System.out.println("Tip scorerId2: " + $currentInitiator.getClass().getName());
+    modify($chain) {
+        setInitiatorId($previousAssister),
+        setAssistCount($chain.getAssistCount() + 1)
+    }
+end
+
+
+rule "CheckInitiator"
+salience 70
+when
+    $chain: AssistChain(
+        traced == false,
+        assistCount >= 1,
+        $initiatorId: initiatorId,
+        $teamId: teamId,
+        $time: timestamp
+    )
+    GameEvent(
+        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+        playerId == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 20000)
+    )
+    not GameEvent(
+        eventType == EventType.ASSIST,
+        details["receiverId"] == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 15000),
+        processed == true
+    )
+then
+    System.out.println("[4] Pronađen inicijator sa STEAL/REBOUND: " + $initiatorId);
+
+    modify($chain) {
+        setTraced(true)
+    }
+end
+
+
+rule "MarkAsTracedNoInitiator"
+salience 65
+when
+    $chain: AssistChain(
+        traced == false,
+        assistCount >= 2,
+        $initiatorId: initiatorId,
+        $teamId: teamId,
+        $time: timestamp
+    )
+    not GameEvent(
+        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+        playerId == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 20000)
+    )
+    not GameEvent(
+        eventType == EventType.ASSIST,
+        details["receiverId"] == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 15000),
+        processed == true
+    )
+then
+    System.out.println("[5] Lanac završen bez STEAL/REBOUND: " + $initiatorId);
+
+    modify($chain) {
+        setTraced(true)
+    }
+end
+
+rule "GenerateChainCommentWithInitiator"
+salience 60
+when
+    $chain: AssistChain(
+        traced == true,
+        assistCount >= 2,
+        $initiatorId: initiatorId,
+        $scorerId: scorerId,
+        $teamId: teamId,
+        $assistCount: assistCount,
+        $time: timestamp
+    )
+
+    $initEvent: GameEvent(
+        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+        playerId == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 20000),
+        $initEventType: eventType
+    )
+
+    $initiator: Player(id == $initiatorId, $initiatorName: name)
+    $scorer: Player(id == $scorerId, $scorerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    String actionType = $initEventType == EventType.STEAL ? "ukradenom loptom" : "skočenom loptom";
+
+    String comment = "Ovu sjajnu akciju započeo je " + $initiatorName +" sa " + actionType + ", a završio je " + $scorerName + " nakon " + $assistCount + " dodavanja!";
+
+    insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
+    System.out.println("[6A] KOMENTAR SA INICIJALNIM EVENTOM: " + comment);
+
+end
+
+
+rule "GenerateChainCommentWithoutInitiator"
+salience 59
+when
+    $chain: AssistChain(
+        traced == true,
+        assistCount >= 2,
+        $initiatorId: initiatorId,
+        $scorerId: scorerId,
+        $teamId: teamId,
+        $assistCount: assistCount,
+        $time: timestamp
+    )
+
+    not GameEvent(
+        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+        playerId == $initiatorId,
+        teamId == $teamId,
+        timestamp < $time,
+        timestamp >= ($time - 20000)
+    )
+
+    $initiator: Player(id == $initiatorId, $initiatorName: name)
+    $scorer: Player(id == $scorerId, $scorerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    String comment = "Odlicna timska igra tima " + $teamName + "! " + $initiatorName + " je pokrenuo akciju, a " + $scorerName + " zavrsio nakon " + $assistCount + " dodavanja!";
+
+    insert(new CommentaryLine(comment, Importance.MEDIUM, Type.ANALYSIS));
+    System.out.println("[6B] KOMENTAR BEZ INICIJALNOG EVENTA: " + comment);
+end
+
+
+rule "RemoveSimpleChain"
+salience 55
+when
+    $chain: AssistChain(
+        traced == true,
+        assistCount == 1
+    )
+then
+    System.out.println("[7] Lanac sa samo 1 asistencijom - nema poseban komentar");
+end
+
+
+rule "TimeoutChain"
+salience 50
+when
+    $chain: AssistChain(
+        traced == false,
+        $time: timestamp
+    )
+    eval(System.currentTimeMillis() - $time > 3000)  // 3 sekunde
+then
+    System.out.println("[8] Timeout za lanac @ " + $time);
+    retract($chain);
+end
+
+rule "CleanupTracedChains"
+salience 40
+when
+    $chain: AssistChain(
+        traced == true,
+        $time: timestamp
+    )
+    eval(System.currentTimeMillis() - $time > 5000)
+then
+    System.out.println("[9] Cleanup traced chain @ " + $time);
+    retract($chain);
+end
+
+
+//
+//
+//query findInitiator(Long playerId1, Long teamId1, Long timestamp1)
+//    // BAZNI SLUČAJ: Nema incoming asistencije
+//     not GameEvent(
+//        eventType == EventType.ASSIST,
+//        details["receiverId"] == playerId,
+//        teamId == teamId1,
+//        timestamp < timestamp1,
+//        timestamp >= (timestamp1 - 15000),
+//        processed == true
+//    ;)
+//    or
+//    (
+//        GameEvent(
+//            eventType == EventType.ASSIST,
+//            details["receiverId"] == playerId,
+//            teamId == teamId1,
+//            timestamp < timestamp1,
+//            timestamp >= (timestamp1 - 15000),
+//            processed == true,
+//            $assisterId: playerId,
+//            $assistTime: timestamp1
+//        ;)
+//        and
+//        findInitiator(playerId1, teamId1, timestamp1;)
+//    )
+//end
+//
+//// ============================================
+//// PRAVILO 1: Pokreni backwards chaining
+//// ============================================
+//
+//rule "StartBackwardsChaining"
+//    salience 100
+//when
+//    $shot: GameEvent(
+//        eventType == EventType.SHOT_MADE,
+//        (details["points"] == 2 || details["points"] == 3),
+//        $scorerId: playerId,
+//        $teamId: teamId,
+//        $shotTime: timestamp
+//    )
+//
+//    not AssistChain(scorerId == $scorerId, timestamp == $shotTime)
+//
+//    // Bar 2 asistencije
+//    $assistCount: Number(intValue >= 2) from accumulate(
+//        GameEvent(
+//            eventType == EventType.ASSIST,
+//            teamId == $teamId,
+//            timestamp < $shotTime,
+//            timestamp >= ($shotTime - 15000),
+//            processed == true
+//        ),
+//        count(1)
+//    )
+//
+//    // POZOVI QUERY - backwards chaining
+//    findInitiator($scorerId, $teamId, $shotTime;)
+//
+//    // Nađi inicijatora
+//    $assistEvent: GameEvent(
+//        eventType == EventType.ASSIST,
+//        teamId == $teamId,
+//        timestamp < $shotTime,
+//        timestamp >= ($shotTime - 15000),
+//        processed == true,
+//        $initiatorId: playerId
+//    )
+//
+//    not GameEvent(
+//        eventType == EventType.ASSIST,
+//        details["receiverId"] == $initiatorId,
+//        teamId == $teamId,
+//        timestamp < $shotTime,
+//        timestamp >= ($shotTime - 15000),
+//        processed == true
+//    )
+//then
+//    System.out.println("[BACKWARDS CHAIN] Lanac pronađen!");
+//    System.out.println("  Scorer: " + $scorerId);
+//    System.out.println("  Inicijator: " + $initiatorId);
+//    System.out.println("  Broj asistencija: " + $assistCount);
+//
+//    AssistChain chain = new AssistChain();
+//    chain.setScorerId($scorerId);
+//    chain.setTeamId($teamId);
+//    chain.setInitiatorId($initiatorId);
+//    chain.setAssistCount($assistCount.intValue());
+//    chain.setTraced(true);
+//    chain.setTimestamp($shotTime);
+//    insert(chain);
+//end
+//
+//// ============================================
+//// PRAVILO 2: Komentar sa STEAL/REBOUND
+//// ============================================
+//
+//rule "GenerateCommentWithSteal"
+//    salience 90
+//when
+//    $chain: AssistChain(
+//        traced == true,
+//        assistCount >= 2,
+//        $initiatorId: initiatorId,
+//        $scorerId: scorerId,
+//        $teamId: teamId,
+//        $count: assistCount,
+//        $time: timestamp
+//    )
+//
+//    $initEvent: GameEvent(
+//        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+//        playerId == $initiatorId,
+//        teamId == $teamId,
+//        timestamp < $time,
+//        timestamp >= ($time - 20000),
+//        $eventType: eventType
+//    )
+//
+//    $initiator: Player(id == $initiatorId, $initiatorName: name)
+//    $scorer: Player(id == $scorerId, $scorerName: name)
+//then
+//    // Uklonjen ; iz ternarnog operatora
+//    String action = ($eventType == EventType.STEAL) ? "ukradenom loptom" : "skočenom loptom";
+//
+//    // Uklonjeni ; iz sredine string konkatenacije
+//    String comment = "Ovu sjajnu akciju započeo je " + $initiatorName + " sa " + action + ", a završio je " + $scorerName + " nakon " + $count + " dodavanja!";
+//
+//    insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
+//    System.out.println("[KOMENTAR SA INICIJALNIM EVENTOM]: " + comment);
+//
+//    // Uklonjena dvotačka sa kraja
+//    retract($chain);
+//end
+//
+//// ============================================
+//// PRAVILO 3: Komentar bez STEAL/REBOUND
+//// ============================================
+//
+//rule "GenerateCommentWithoutSteal"
+//    salience 85
+//when
+//    $chain: AssistChain(
+//        traced == true,
+//        assistCount >= 2,
+//        $initiatorId: initiatorId,
+//        $scorerId: scorerId,
+//        $teamId: teamId,
+//        $count: assistCount,
+//        $time: timestamp
+//    )
+//
+//    not GameEvent(
+//        (eventType == EventType.STEAL || eventType == EventType.REBOUND),
+//        playerId == $initiatorId,
+//        teamId == $teamId,
+//        timestamp < $time,
+//        timestamp >= ($time - 20000)
+//    )
+//
+//    $initiator: Player(id == $initiatorId, $initiatorName: name)
+//    $scorer: Player(id == $scorerId, $scorerName: name)
+//    $team: Team(id == $teamId, $teamName: name)
+//then
+//    // Uklonjeni ; iz sredine string konkatenacije
+//    String comment = "Odlična timska igra tima " + $teamName + "! " + $initiatorName + " je pokrenuo akciju, a " + $scorerName + " završio nakon " + $count + " dodavanja!";
+//
+//    insert(new CommentaryLine(comment, Importance.MEDIUM, Type.ANALYSIS));
+//    System.out.println("[KOMENTAR BEZ INICIJALNOG EVENTA]: " + comment);
+//
+//    // Uklonjena dvotačka sa kraja
+//    retract($chain);
+//end
