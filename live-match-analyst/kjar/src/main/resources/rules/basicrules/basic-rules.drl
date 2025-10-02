@@ -227,3 +227,15 @@ then
     
     insert(new CommentaryLine("Faul! " + $playerName + " iz tima " + $teamName + " je napravio faul. To mu je " + ($stats.getFouls()) + ". faul u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
+
+rule "TimeoutComment"
+when
+    $event: GameEvent(eventType == EventType.TIMEOUT, $teamId: teamId)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Timeout! Tim " + $teamName + " je zatražio prekid.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+end
