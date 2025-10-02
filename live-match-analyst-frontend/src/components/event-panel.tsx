@@ -53,6 +53,8 @@ const PLAYER_EVENTS = [
   "SUBSTITUTION",
 ];
 
+const TEAM_EVENTS = ["TIMEOUT"];
+
 const SHOT_EVENTS = ["SHOT_MADE", "SHOT_MISSED"];
 
 export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
@@ -63,6 +65,7 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const [shotType, setShotType] = useState<string>("");
 
   const requiresPlayer = eventType && PLAYER_EVENTS.includes(eventType);
+  const requiresTeam = eventType && TEAM_EVENTS.includes(eventType);
   const requiresShot = eventType && SHOT_EVENTS.includes(eventType);
 
   const currentTeam =
@@ -71,6 +74,7 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const canSendEvent = () => {
     if (!eventType) return false;
     if (requiresPlayer && (!selectedTeam || !selectedPlayer)) return false;
+    if (requiresTeam && !selectedTeam) return false;
     if (requiresShot && (!points || !shotType)) return false;
     return true;
   };
@@ -91,6 +95,10 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
         playerId = player.id;
         teamId = team.id;
       }
+    } else if (requiresTeam && selectedTeam) {
+      const team = selectedTeam === "A" ? teamA : teamB;
+      teamId = team.id;
+      // No player needed for team events like TIMEOUT
     }
 
     let details: Record<string, unknown> | undefined;
@@ -115,7 +123,8 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
         | "STEAL"
         | "BLOCK"
         | "TURNOVER"
-        | "FOUL", // Cast to match backend enum
+        | "FOUL"
+        | "TIMEOUT", // Cast to match backend enum
       details,
     };
 
@@ -154,7 +163,7 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
         </div>
 
         {/* Team Selection */}
-        {requiresPlayer && (
+        {(requiresPlayer || requiresTeam) && (
           <div className="space-y-2">
             <Label htmlFor="team">Tim</Label>
             <Select
