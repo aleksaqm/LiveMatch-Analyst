@@ -11,13 +11,34 @@ import com.ftn.sbnz.model.models.CommentaryLine.Type;
 
 
 
+declare ThreePointerMilestone
+    playerId: Long
+    milestoneMade: int
+end
+
+declare DefensiveStreakMilestone
+    teamId: Long
+    stopCount: int
+    timeMarker: long
+end
+
+declare ScoringRunMilestone
+    teamId: Long
+    runPoints: int
+    timeMarker: long
+end
+
 rule "SixthThreePointerComment"
 when
     $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, processed == true, $playerId: playerId, $teamId: teamId)
     $stats: PlayerStats(playerId == $playerId, threePointersMade >= 6)
     $player: Player(id == $playerId, $playerName: name)
     $team: Team(id == $teamId, $teamName: name)
+    
+    // Only fire if we haven't already commented on this exact milestone
+    not ThreePointerMilestone(playerId == $playerId, milestoneMade == $stats.getThreePointersMade())
 then
+    insert(new ThreePointerMilestone($playerId, $stats.getThreePointersMade()));
     insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
 end
 
@@ -43,7 +64,12 @@ when
     )
     not (GameEvent(eventType == EventType.SHOT_MADE, teamId == $teamId) over window:time(1m))
     $defendingTeam: Team(id != $teamId, $defendingTeamName: name)
+    
+    // Prevent duplication by checking if we already commented on similar streak recently
+    not DefensiveStreakMilestone(teamId != $teamId, stopCount >= ($stops.intValue() - 1), timeMarker > (System.currentTimeMillis() - 120000))
 then
+    long currentTime = System.currentTimeMillis();
+    insert(new DefensiveStreakMilestone($defendingTeam.getId(), $stops.intValue(), currentTime));
     insert(new CommentaryLine("Odlična defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspešnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
 end
 
@@ -64,7 +90,12 @@ when
         teamId != $teamId
     ) over window:time(2m))
     $opposingTeam: Team(id != $teamId, $opposingTeamName: name)
+    
+    // Prevent duplication by checking if we already commented on similar run recently
+    not ScoringRunMilestone(teamId == $teamId, runPoints >= ($run.intValue() - 2), timeMarker > (System.currentTimeMillis() - 120000))
 then
+    long currentTime = System.currentTimeMillis();
+    insert(new ScoringRunMilestone($teamId, $run.intValue(), currentTime));
     insert(new CommentaryLine(
         "Kakva serija tima " + $teamName + "! Rezultat je " + $run.intValue() + "-0 u poslednja dva minuta!",
         Importance.HIGH,
