@@ -231,6 +231,7 @@ end
 
 rule "UpdateScoreOnShotMade"
     salience 999
+    no-loop true
 when
     $event: GameEvent(eventType == EventType.SHOT_MADE, processed == true, $teamId: teamId, $points: details["points"])
     $score: Score(team1Id == $teamId || team2Id == $teamId)
@@ -242,6 +243,7 @@ then
     } else if ($teamId.equals($score.getTeam2Id())) {
         modify($score) { setTeam2Score($score.getTeam2Score() + pointsToAdd) }
     }
+    update($score)
     
     System.out.println("Score updated by Drools: Team " + $score.getTeam1Id() + ": " + $score.getTeam1Score() + 
                       " - Team " + $score.getTeam2Id() + ": " + $score.getTeam2Score());
