@@ -4,6 +4,7 @@ import com.ftn.sbnz.model.dto.AssistStreakByIdTemplateDto;
 import com.ftn.sbnz.model.dto.ScoringStreakTemplateDto;
 import com.ftn.sbnz.model.dto.RuleTemplateDto;
 import com.ftn.sbnz.model.dto.StartGameDto;
+import com.ftn.sbnz.model.dto.GameEventResponseDto;
 import com.ftn.sbnz.model.events.GameEvent;
 import com.ftn.sbnz.model.models.*;
 import com.ftn.sbnz.service.services.GameService;
@@ -32,7 +33,7 @@ public class RuleTestController {
     }
 
     @PostMapping("/event")
-    public List<CommentaryLine> processEvent(@RequestBody GameEvent event) {
+    public GameEventResponseDto processEvent(@RequestBody GameEvent event) {
         return gameService.processSingleEvent(event);
     }
 

@@ -2,6 +2,7 @@ package com.ftn.sbnz.service.services;
 
 import com.ftn.sbnz.model.events.GameEvent;
 import com.ftn.sbnz.model.models.*;
+import com.ftn.sbnz.model.dto.GameEventResponseDto;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 import org.kie.api.runtime.rule.FactHandle;
@@ -42,13 +43,17 @@ public class GameService {
         for (Team team : teams) this.originalKieSession.insert(team);
 //        for (PlayerStats stat : stats) this.originalKieSession.insert(stat);
         
-        // Template session will be created when first template is registered
+        if (teams.size() >= 2) {
+            Score gameScore = new Score(teams.get(0).getId(), teams.get(1).getId(), 0, 0);
+            this.originalKieSession.insert(gameScore);
+        }
+        
         this.templateKieSession = null;
         
         System.out.println("Game started with original session. Template session will be created when needed.");
     }
 
-    public List<CommentaryLine> processSingleEvent(GameEvent event) {
+    public GameEventResponseDto processSingleEvent(GameEvent event) {
         List<CommentaryLine> allComments = new ArrayList<>();
         
         try {
@@ -72,7 +77,21 @@ public class GameService {
             e.printStackTrace();
         }
 
-        return allComments;
+        Score currentScore = extractScoreFromDrools();
+        
+        return new GameEventResponseDto(allComments, currentScore);
+    }
+    
+    private Score extractScoreFromDrools() {
+        if (originalKieSession != null) {
+            for (FactHandle handle : originalKieSession.getFactHandles()) {
+                Object obj = originalKieSession.getObject(handle);
+                if (obj instanceof Score) {
+                    return (Score) obj;
+                }
+            }
+        }
+        return null; // Return null if no score found
     }
     
     private List<CommentaryLine> processEventInSession(KieSession session, GameEvent event, String sessionType) {
@@ -176,7 +195,7 @@ public class GameService {
         if (originalKieSession != null) {
             for (FactHandle handle : originalKieSession.getFactHandles()) {
                 Object fact = originalKieSession.getObject(handle);
-                if (fact instanceof Player || fact instanceof Team || fact instanceof PlayerStats) {
+                if (fact instanceof Player || fact instanceof Team || fact instanceof PlayerStats || fact instanceof Score) {
                     session.insert(fact);
                 }
             }

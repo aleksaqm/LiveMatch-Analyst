@@ -1,0 +1,137 @@
+package basicrules;
+
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.events.GameEvent.EventType;
+import com.ftn.sbnz.model.models.Score;
+import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.CommentaryLine.Importance;
+import com.ftn.sbnz.model.models.CommentaryLine.Type;
+
+declare LeadTaken
+    leadingTeamId: Long
+    trailingTeamId: Long
+    leadMargin: int
+    whenTaken: long
+end
+
+// LEVEL 1: Simple lead detection after shot
+rule "Level1_SimpleLeadAfterShot"
+    salience 100
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, processed == true, $teamId: teamId, $points: details["points"])
+    $score: Score()
+    $team: Team(id == $teamId, $teamName: name)
+then
+    int points = ((Number) $points).intValue();
+    int leadMargin = 0;
+    boolean isLeading = false;
+    Long trailingTeamId = null;
+    
+    // Calculate who leads and by how much
+    if ($teamId.equals($score.getTeam1Id())) {
+        if ($score.getTeam1Score() > $score.getTeam2Score()) {
+            isLeading = true;
+            leadMargin = $score.getTeam1Score() - $score.getTeam2Score();
+            trailingTeamId = $score.getTeam2Id();
+        }
+    } else if ($teamId.equals($score.getTeam2Id())) {
+        if ($score.getTeam2Score() > $score.getTeam1Score()) {
+            isLeading = true;
+            leadMargin = $score.getTeam2Score() - $score.getTeam1Score();
+            trailingTeamId = $score.getTeam1Id();
+        }
+    }
+    
+    boolean shouldTrigger = false;
+    
+    if (isLeading && leadMargin <= 3) {
+        if (points == 3) {
+            shouldTrigger = true;
+        } else if (leadMargin == 2 && points == 2) {
+            shouldTrigger = true;
+        } else if (leadMargin == 1 && (points == 2 || points == 3 || points == 1)) {
+            shouldTrigger = true;
+        }
+    }
+    
+    if (shouldTrigger) {
+        long currentTime = System.currentTimeMillis();
+        insert(new LeadTaken($teamId, trailingTeamId, leadMargin, currentTime));
+        
+        insert(new CommentaryLine($teamName + " PRELAZI U VOĐSTVO! Razlika: " + leadMargin + " poena!", 
+                                 Importance.HIGH, Type.HIGHLIGHT));
+        
+        System.out.println("LEVEL 1: " + $teamName + " PRELAZI U VODJSTVO! Points: " + points + ", Lead: " + leadMargin);
+    }
+end
+
+rule "Level2_TimeoutAfterLeadTaken"
+    salience 80
+when
+    $leadTaken: LeadTaken($leadingTeamId: leadingTeamId, $trailingTeamId: trailingTeamId, leadMargin >= 1)
+    
+    // Timeout called by the trailing team
+    $timeout: GameEvent(eventType == EventType.TIMEOUT, teamId == $trailingTeamId, processed == false)
+    
+    $leadingTeam: Team(id == $leadingTeamId, $leadingTeamName: name)
+    $trailingTeam: Team(id == $trailingTeamId, $trailingTeamName: name)
+then
+    // Mark timeout as processed
+    modify($timeout) { setProcessed(true) }
+    
+    // Calculate how long they waited before calling timeout
+    long delayTime = (System.currentTimeMillis() - $leadTaken.getWhenTaken()) / 1000;
+    
+    insert(new CommentaryLine("TIMEOUT " + $trailingTeamName + "! Trener reaguje na gubitak vođstva!", 
+                             Importance.CRITICAL, Type.HIGHLIGHT));
+    
+    // Clean up - lead momentum interrupted
+    retract($leadTaken);
+    
+    System.out.println("LEVEL 2: TIMEOUT! " + $trailingTeamName + " calls timeout after losing lead (" + delayTime + " seconds)");
+end
+
+// LEVEL 3: Team response after calling timeout
+rule "Level3_GoodTimeoutResponse"
+    salience 70
+when
+    // Any made shot
+    $event: GameEvent(eventType == EventType.SHOT_MADE, processed == true, $teamId: teamId, $points: details["points"])
+    
+    $timeout: GameEvent(eventType == EventType.TIMEOUT, teamId == $teamId, processed == true) over window:time(2m)
+    
+    // IMPORTANT: Shot must be AFTER timeout (by timestamp)
+    eval($event.getTimestamp() > $timeout.getTimestamp())
+    
+    $score: Score()
+    $team: Team(id == $teamId, $teamName: name)
+then
+    int points = ((Number) $points).intValue();
+    int leadMargin = 0;
+    boolean isLeading = false;
+    boolean wasTrailing = true; // They called timeout, so they were trailing
+    
+    if ($teamId.equals($score.getTeam1Id())) {
+        if ($score.getTeam1Score() >= $score.getTeam2Score()) {
+            isLeading = true;
+            leadMargin = $score.getTeam1Score() - $score.getTeam2Score();
+        }
+    } else if ($teamId.equals($score.getTeam2Id())) {
+        if ($score.getTeam2Score() >= $score.getTeam1Score()) {
+            isLeading = true;
+            leadMargin = $score.getTeam2Score() - $score.getTeam1Score();
+        }
+    }
+    
+    if (isLeading || points >= 2) {
+        insert(new CommentaryLine("DOBAR TIMEOUT! " + $teamName + " se vraća u igru!", 
+                                 Importance.HIGH, Type.HIGHLIGHT));
+        
+        if (isLeading && leadMargin > 0) {
+            insert(new CommentaryLine("Odličan odgovor! " + $teamName + " preuzima kontrolu posle timeout-a!", 
+                                     Importance.MEDIUM, Type.ANALYSIS));
+        }
+    }
+end
+

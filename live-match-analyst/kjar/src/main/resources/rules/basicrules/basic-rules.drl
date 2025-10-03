@@ -5,6 +5,7 @@ import com.ftn.sbnz.model.events.GameEvent.EventType;
 import com.ftn.sbnz.model.models.PlayerStats;
 import com.ftn.sbnz.model.models.Player;
 import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.Score;
 import com.ftn.sbnz.model.models.CommentaryLine;
 import com.ftn.sbnz.model.models.CommentaryLine.Importance;
 import com.ftn.sbnz.model.models.CommentaryLine.Type;
@@ -226,4 +227,34 @@ then
     }
     
     insert(new CommentaryLine("Faul! " + $playerName + " iz tima " + $teamName + " je napravio faul. To mu je " + ($stats.getFouls()) + ". faul u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+end
+
+rule "UpdateScoreOnShotMade"
+    salience 999
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, processed == true, $teamId: teamId, $points: details["points"])
+    $score: Score(team1Id == $teamId || team2Id == $teamId)
+then
+    int pointsToAdd = ((Number) $points).intValue();
+    
+    if ($teamId.equals($score.getTeam1Id())) {
+        modify($score) { setTeam1Score($score.getTeam1Score() + pointsToAdd) }
+    } else if ($teamId.equals($score.getTeam2Id())) {
+        modify($score) { setTeam2Score($score.getTeam2Score() + pointsToAdd) }
+    }
+    
+    System.out.println("Score updated by Drools: Team " + $score.getTeam1Id() + ": " + $score.getTeam1Score() + 
+                      " - Team " + $score.getTeam2Id() + ": " + $score.getTeam2Score());
+end
+
+rule "TimeoutComment"
+when
+    $event: GameEvent(eventType == EventType.TIMEOUT, $teamId: teamId)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    modify($event){
+        setProcessed(true)
+    }
+    
+    insert(new CommentaryLine("Timeout! Tim " + $teamName + " je zatražio prekid.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
 end

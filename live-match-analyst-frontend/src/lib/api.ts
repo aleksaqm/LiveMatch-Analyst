@@ -18,7 +18,7 @@ export type GameEvent = {
   timestamp?: number
   playerId?: number
   teamId?: number
-  eventType: "SHOT_MADE" | "SHOT_MISSED" | "REBOUND" | "ASSIST" | "STEAL" | "BLOCK" | "TURNOVER" | "FOUL"
+  eventType: "SHOT_MADE" | "SHOT_MISSED" | "REBOUND" | "ASSIST" | "STEAL" | "BLOCK" | "TURNOVER" | "FOUL" | "TIMEOUT"
   details?: Record<string, unknown>
   processed?: boolean
 }
@@ -32,6 +32,18 @@ export type CommentaryLine = {
   text: string
   importance: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
   type: "PLAY_BY_PLAY" | "ANALYSIS" | "STATISTIC" | "HIGHLIGHT"
+}
+
+export type Score = {
+  team1Id: number
+  team2Id: number
+  team1Score: number
+  team2Score: number
+}
+
+export type GameEventResponse = {
+  commentary: CommentaryLine[]
+  score: Score
 }
 
 export type AssistStreakByIdTemplateDto = {
@@ -80,7 +92,7 @@ export async function startGame(gameData: StartGameDto): Promise<{ success: bool
 /**
  * Send a game event to the backend via HTTP POST
  */
-export async function sendGameEvent(event: GameEvent): Promise<{ success: boolean; commentary?: CommentaryLine[]; error?: string }> {
+export async function sendGameEvent(event: GameEvent): Promise<{ success: boolean; data?: GameEventResponse; error?: string }> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/rules/event`, {
       method: "POST",
@@ -94,8 +106,8 @@ export async function sendGameEvent(event: GameEvent): Promise<{ success: boolea
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    const commentary = await response.json()
-    return { success: true, commentary }
+    const data = await response.json() as GameEventResponse
+    return { success: true, data }
   } catch (error) {
     console.error("Error sending game event:", error)
     return {

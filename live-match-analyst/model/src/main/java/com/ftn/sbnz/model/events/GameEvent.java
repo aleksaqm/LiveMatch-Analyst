@@ -13,7 +13,7 @@ import java.util.Map;
 @Expires("3m")
 public class GameEvent {
     public enum EventType {
-        SHOT_MADE, SHOT_MISSED, REBOUND, ASSIST, STEAL, BLOCK, TURNOVER, FOUL
+        SHOT_MADE, SHOT_MISSED, REBOUND, ASSIST, STEAL, BLOCK, TURNOVER, FOUL, TIMEOUT
     }
 
     private long timestamp;
