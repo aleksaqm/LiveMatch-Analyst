@@ -33,10 +33,9 @@ Prednost našeg rešenja biće u dubini analize i kvalitetu generisanog komentar
 
 #### **Očekivani ulazi u sistem (Input)**
 
-Sistem će obrađivati tok (stream) događaja u realnom vremenu. Svaki događaj će biti predstavljen kao strukturirani podatak (npr. JSON objekat) koji opisuje jednu akciju u igri. Za košarkašku utakmicu, primeri događaja su:
+Sistem će obrađivati tok (stream) događaja u realnom vremenu. Svaki događaj će biti predstavljen kao strukturirani podatak (npr. JSON objekat) koji opisuje jednu akciju u igri. Za košarkašku utakmicu, primer događaja je:
 
 - **GameEvent:** `SHOT_MADE`, `SHOT_MISSED`, `REBOUND`, `ASSIST`, `STEAL`, `BLOCK`, `TURNOVER`, `FOUL`.
-- **ControlEvent:** `GAME_START`, `QUARTER_END`, `TIMEOUT`, `SUBSTITUTION`.
 
 Svaki događaj će sadržati detaljne atribute:
 
@@ -67,190 +66,110 @@ Baza znanja će se sastojati od činjenica koje opisuju trenutno stanje utakmice
 
 **Činjenice u radnoj memoriji:**
 
-- `GameClock`: Trenutno vreme i preostalo vreme u četvrtini.
 - `Score`: Trenutni rezultat.
 - `Player`, `Team`: Osnovni podaci o učesnicima.
 - `PlayerStats`: Ažurirana statistika za svakog igrača.
-- Svi dolazni `GameEvent` i `ControlEvent` objekti.
-- Izvedene činjenice kao što su `TeamMomentum`, `PlayerHotStreak`, `CloseGameSituation`.
+- Svi dolazni `GameEvent` objekti.
+- Izvedene činjenice kao što su `TeamMomentum`, `PlayerHotStreak`.
 
-**Primeri pravila (od jednostavnih ka složenim):**
+**Primeri pravila :**
 
 - **Osnovno pravilo:** `WHEN ShotMade(points=3) THEN generate("Trojka!")`
-- **Kontekstualno pravilo:** `WHEN ShotMade(points=3, player=X) AND PlayerStats(player=X, threePointersMade > 5) THEN generate("Neverovatni X nastavlja svoju seriju sa distance, ovo mu je već šesta trojka!")`
-- **Analitičko pravilo:** `WHEN Turnover(team=A) THEN insert(new FastbreakOpportunity(team=B))`
+- **Kontekstualno pravilo (primer):** `WHEN ShotMade(points=3, player=X) AND PlayerStats(player=X, threePointersMade > 5) THEN generate("Neverovatni X nastavlja svoju seriju sa distance, ovo mu je već šesta trojka!")`
+- **Analitičko pravilo:** `WHEN Turnover(team=A) THEN insert(new FastBreakAfterDefense(team=B))`
 
 ---
 
 ### **Primeri primene naprednih koncepata**
 
-#### **1. Primer Forward-Chaininga (ulančavanje na 3+ nivoa)**
+### **1. Primer Forward-Chaininga (ulančavanje na 3+ nivoa)**  
+1.1 Defanzivni Momentum
+**Cilj:** Detektovanje defensivne dominacije kroz seriju povezanih akcija i reakcija timova.
 
-Cilj je prepoznati ključnu sekvencu koja menja tok utakmice.
+#### Level 1 - Defanzivna Serija
+Detektuje 2 uzastopne defanzivne akcije (steal/block) istog tima u roku od 1 minuta. Kreira `DefensiveStreak` fact i generiše komentar o odbrambenom pressingu.
 
-- **Pravilo 1 (Nivo 1):** Kada igrač postigne treći koš zaredom bez promašaja, sistem kreira novu činjenicu.
-  ```drl
-  when
-      $p: Player()
-      $s1: ShotMade(playerId == $p.id)
-      $s2: ShotMade(playerId == $p.id, this after $s1, this != $s1)
-      $s3: ShotMade(playerId == $p.id, this after $s2, this != $s2)
-      not (ShotMissed(playerId == $p.id) over window:time(1m)) // Nije promašio u poslednjem minutu
-  then
-      insert(new PlayerOnHotStreak($p.id));
-      // Komentar: "Igrač X je u seriji! To mu je treći vezani pogodak!"
-  ```
-- **Pravilo 2 (Nivo 2):** Ako igrač u "vrućoj seriji" postigne još poena i tim povede, to stvara momentum za ceo tim.
-  ```drl
-  when
-      PlayerOnHotStreak(playerId == $p_id)
-      ShotMade(playerId == $p_id, $teamId: teamId)
-      Score(leadingTeam != $teamId) // Tim je gubio pre ovog koša
-  then
-      insert(new MomentumShift($teamId, "Player-driven comeback"));
-      // Komentar: "Potpuni preokret u režiji igrača X! Njegov tim sada vodi!"
-  ```
-- **Pravilo 3 (Nivo 3):** Ako protivnički tim odmah nakon promene momentuma zatraži tajm-aut, sistem generiše dublji analitički komentar.
-  ```drl
-  when
-      MomentumShift($teamId: teamId)
-      Timeout(teamId != $teamId) over window:time(10s) // Tajm-aut u roku od 10s
-  then
-      // Generiši analizu
-      insert(new CommentaryLine("Trener gostiju je primoran da reaguje. Serija tima " + $teamId + " je potpuno poremetila ritam utakmice i ovaj tajm-aut je bio neophodan da se zaustavi nalet protivnika.", Importance.HIGH, Type.ANALYSIS));
-  ```
+#### Level 2 - Brza Tranzicija  
+Proverava da li tim konvertuje odbranu u brze poene (shot_made unutar 10s). Kreira `FastBreakAfterDefense` fact i hvali efikasnu tranziciju.
 
-#### **2. Primer CEP-a (Complex Event Processing)**
+#### Level 3 - Haos Protivnika
+Prati da li protivnik pravi turnover unutar 30s nakon fast breaka. Kreira `DefensiveDominance` fact i naglašava dezorijentaciju protivnika.
+
+#### Level 4 - Faul iz Nemoći  
+Detektuje faul protivnika unutar 45s od uspostavljene dominacije. Generiše kritičan komentar o potpunoj kontroli i nemoći protivnika.  
+
+---
+
+1.2 Timeout Reakcija
+#### Level 1 - Preuzimanje Vođstva
+Detektuje kada tim preuzima vođstvo nakon koša (razlika 1-3 poena). Kreira `LeadTaken` fact sa podacima o vodećem i gubitničkom timu i generiše komentar o promeni vođstva.
+
+#### Level 2 - Timeout Reakcija
+Prati da li gubinički tim zove timeout nakon što je izgubio vođstvo. Meri vreme reakcije trenera, retraktuje `LeadTaken` fact i hvali brzu trenersku reakciju.
+
+#### Level 3 - Odgovor Posle Timeout-a
+Proverava da li tim koji je zvao timeout postiže koš ili preuzima vođstvo u naredne 2 minute. Kreira `TimeoutProcessed` fact da spreči duplo okidanje i generiše komentar o efikasnosti timeout-a.
+
+---
+
+### **2. Primer CEP-a (Complex Event Processing)**
 
 CEP je ključan za prepoznavanje obrazaca u toku događaja.
 
-- **Detekcija serije poena (Scoring Run):** Sistem treba da detektuje kada jedan tim postigne npr. 8 ili više poena zaredom, bez poena protivnika.
+#### 1. Defanzivna Serija Zaustavljanja
 
-  ```drl
-  when
-      accumulate (
-          GameEvent(
-              type == EventType.SHOT_MADE,
-              $team: teamId,
-              $points: details['points']
-          ) over window:time(2m),
-          $run: sum($points)
-      )
-      // I u istom prozoru nema poena drugog tima
-      not (GameEvent(type == EventType.SHOT_MADE, teamId != $team) over window:time(2m))
-      ($run >= 8)
-  then
-      insert(new CommentaryLine("Kakva serija tima " + $team + "! Rezultat je " + $run + "-0 u poslednja dva minuta!", Importance.HIGH));
-  ```
+**Cilj:** Detektovanje dominantne defanzive kroz kontinuirane zaustavljene napade protivnika u vremenskom prozoru.
 
-- **Detekcija defanzivne dominacije (Defensive Stop Streak):** Sistem treba da detektuje situaciju kada jedan tim u kratkom vremenskom periodu (npr. 2 minuta) natera protivnika na minimum 6 uzastopnih neuspešnih napada (promašaj ili izgubljena lopta). Ovo je indikator jake defanzivne serije.
+**Pravilo:** Prati promaše i izgubljene lopte protivničkog tima u poslednja 2 minuta. Kada protivnik napravi 6+ neuspešnih napada bez postignutog koša u poslednji minut, generiše se komentar o odličnoj defanzivi.
 
-  ```drl
-  when
-      // Akumuliramo neuspešne napade protivnika u okviru prozora od 1 minuta
-      accumulate (
-          GameEvent(
-              (type == EventType.SHOT_MISSED || type == EventType.TURNOVER),
-              $team: teamId
-          ) over window:time(2m),
-          $stops: count(1)
-      )
-      // Proveravamo da u istom prozoru nema pogodaka tog tima
-      not (GameEvent(type == EventType.SHOT_MADE, teamId == $team) over window:time(1m))
-      ($stops >= 6)
-  then
-      insert(new CommentaryLine(
-          "Odlična defanziva! Tim " + $team + " je zaustavljen u šest uzastopnih napada u poslednja 2 minuta.",
-          Importance.HIGH,
-          Type.ANALYSIS
-      ));
-  end
-  ```
+---
 
-#### **3. Primer Backward-Chaininga (Queries)**
+#### 2. Scoring Run (Serija Poena)
 
-Na kraju utakmice, ili na zahtev korisnika, sistem može da pruži analizu ishoda. Backward-chaining je idealan za odgovaranje na pitanje "Zašto je tim A pobedio?".
+**Cilj:** Identifikovanje ofanzivne dominacije kada tim postiže seriju poena bez odgovora protivnika.
 
-```drl
-query "findKeyWinningFactors"(String winningTeam, List factors)
-    ?hasReboundDominance(winningTeam, factors) or
-    ?hasStarPerformance(winningTeam, factors) or
-    ?hasClutchExecution(winningTeam, factors)
-end
+**Pravilo:** Akumulira poene iz postignutih koševa u poslednja 2 minuta. Kada tim postigne 8+ poena bez ijednog koša protivnika u istom periodu, detektuje se scoring run.
 
-// Pod-query za dominaciju u skoku
-query "hasReboundDominance"(String team, List factors)
-    ?hasOffensiveReboundEdge(team) and
-    ?hasDefensiveReboundControl(team) and
-    eval(factors.add("Dominacija u skoku - kombinacija ofanzivne i defanzivne kontrole."))
-end
+---
 
-// Pod-query za igru zvezdu tima
-query "hasStarPerformance"(String team, List factors)
-    ?hasHighScoringPlayer(team, factors) and
-    ?hasEfficientShooting(team)
-end
+### **3. Primer Backward-Chaininga**
 
-// Pod-query za "clutch" završnicu
-query "hasClutchExecution"(String team, List factors)
-    ?hasScoringRunInFourth(team, factors) and
-    ?hasDefensiveStopStreak(team)
-end
+**Cilj:** Rekonstrukcija kompletnog lanca dodavanja unazad od postignutog koša do igrača koji je inicirao napad (steal ili rebound).
 
-// Konkretne provere za skok
-query "hasOffensiveReboundEdge"(String team)
-    TeamStats(teamId == team, offensiveRebounds > 15)
-end
+#### Rekurzivni Query: getBasketInitiator
+Rekurzivno prati lanac PASS evenata unazad od poslednjeg dodavača ka inicijalnom igraču. Osnovni slučaj: pronađen je igrač koji je inicirao napad i nema dalje dodavanje ka njemu. Rekurzivni slučaj: postoji dodavanje ka trenutnom igraču, nastavlja se lanac unazad sa novim dodavačem.
 
-query "hasDefensiveReboundControl"(String team)
-    TeamStats(teamId == team, defensiveRebounds > 25)
-end
+#### Rule 1: Steal kao Inicijator
+Kada se dogodi SHOT_MADE, traži se finalno dodavanje ka strelcu, zatim se identifikuju kandidati koji su ukrali loptu u prethodnih 24 sekunde. Rekurzivni query povezuje lanac od strelca do igrača sa steal eventom i generiše komentar o sjajnoj tranziciji i obrani.
 
-// Konkretne provere za igru zvezde tima
-query "hasHighScoringPlayer"(String team, List factors)
-    $pStats: PlayerStats(teamId == team, points > 35)
-    eval(factors.add($pStats.getPlayerName() + " je imao fenomenalno poentersko veče (" + $pStats.getPoints() + " poena)."))
-end
+#### Rule 2: Rebound kao Inicijator  
+Identično prvom pravilu, ali traži igrača koji je uzeo skok umesto ukradene lopte. Rekurzivni query proverava da li postoji kontinuiran lanac dodavanja od skoka do koša i hvali timski napad i kvalitet skoka.
 
-query "hasEfficientShooting"(String team)
-    TeamStats(teamId == team, fieldGoalPercentage > 0.50)
-end
+---
 
-// Konkretne provere za "clutch" završnicu
-query "hasScoringRunInFourth"(String team, List factors)
-    $run: ScoringRun(teamId == team, quarter == 4, runSize > 10)
-    eval(factors.add("Ključna je bila serija od " + $run.getRunSize() + "-0 u poslednjoj četvrtini."))
-end
-
-query "hasDefensiveStopStreak"(String team)
-    DefensiveSequence(teamId == team, consecutiveStops > 3, quarter == 4)
-end
-```
-
-Pozivanjem ovog upita, sistem bi sakupio sve zadovoljene uslove i formulisao odgovor, npr. _"Tim A je pobedio zahvaljujući sledećim faktorima: Dominacija u ofanzivnom skoku (16), Ključna je bila serija od 12-0 u poslednjoj četvrtini."_
-
-#### **4. Primer korišćenja Templejta i DSL-a**
+### **4. Primer korišćenja Templejta i DSL-a**
 
 Da bi sistem bio proširiv, omogućićemo korisnicima (npr. sportskim analitičarima) da definišu sopstvene obrasce za praćenje putem jednostavnog interfejsa, bez potrebe za programiranjem.
 
-**DSL (Domain Specific Language) primer:**
-`Kada igrač [Ime Igrača] napravi [Broj] asistencija u [Vreme] minuta, generiši komentar [Tekst Komentara] sa važnošću [Važnost]`
+4.1. ***Scoring Streak Template (Serija Pogodaka)***
+**Cilj:** Omogućiti dinamičko kreiranje pravila za praćenje serija **uzastopnih pogodaka** pojedinih igrača. Sistem može da reaguje na različite pragove i generiše prilagođene komentare za specifične igrače bez izmene koda.
+**Parametri:**
+- `playerId`: ID igrača koji se prati.
+- `shotCount`: Minimalan broj uzastopnih pogodaka koji aktivira pravilo.
+- `timeWindowMinutes`: Vremenski prozor (u minutama) unutar kojeg se prati serija.
+- `commentText`: Proizvoljan dodatak komentaru koji se generiše.
+- `importance`: Nivo važnosti komentara (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+    
+**Upotreba:** Idealno za praćenje poena konkretnog igrača.
 
-**Templejt (DRL Template) koji stoji iza toga:**
+ 
+4.2. ***Assist Streak Template (Serija Asistencija)***
+**Cilj:** Kreiranje dinamičkih pravila za praćenje konstantnog razigravanja ekipe od strane nekog igrača, mereno brojem asistencija u kratkom vremenskom roku.
+**Parametri:**
+- `playerId`: ID igrača (plejmejkera) koji se prati.
+- `assistCount`: Minimalan broj asistencija koji aktivira pravilo.
+- `timeWindowMinutes`: Vremenski prozor (u minutama) za praćenje.
+- `commentText`: Osnovni, prilagođeni tekst komentara.
+- `importance`: Nivo važnosti komentara.
 
-```drl
-template "player_assist_streak_rule"
-
-rule "Assist_Streak_@{row.key}"
-when
-    accumulate (
-        GameEvent(type == EventType.ASSIST, playerName == "@{Ime Igrača}") over window:time(@{Vreme}m),
-        $count: count(1)
-    )
-    ($count >= @{Broj})
-then
-    insert(new CommentaryLine("@{Tekst Komentara}", Importance.valueOf("@{Važnost}")));
-end
-```
-
-Korisnik bi kroz UI popunio formu, a sistem bi dinamički generisao i ubacio novo pravilo u Drools engine bez restartovanja aplikacije, čineći sistem izuzetno fleksibilnim.
+**Upotreba:** Idealno za praćenje broja asistencija konkretnog igrača, odnosno razigravanje tima.
