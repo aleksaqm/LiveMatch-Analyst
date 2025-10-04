@@ -9,6 +9,7 @@ import {
   type StartGameDto,
   type Player as BackendPlayer,
   type Team as BackendTeam,
+  type Score,
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,6 +44,16 @@ export default function Home() {
     isGameStarted: false,
     gameInitialized: false,
     currentView: "game",
+  });
+
+  // Lifted state to persist across views
+  const [events, setEvents] = useState<any[]>([]);
+  const [commentaries, setCommentaries] = useState<any[]>([]);
+  const [score, setScore] = useState<Score>({
+    team1Id: gameState.teamA.id,
+    team2Id: gameState.teamB.id,
+    team1Score: 0,
+    team2Score: 0,
   });
 
   const handleStartGame = async (teamA: Team, teamB: Team) => {
@@ -106,6 +117,10 @@ export default function Home() {
       gameInitialized: false,
       currentView: "game",
     });
+    // clear lifted state
+    setEvents([]);
+    setCommentaries([]);
+    setScore({ team1Id: 1, team2Id: 2, team1Score: 0, team2Score: 0 });
   };
 
   const handleShowRules = () => {
@@ -142,6 +157,12 @@ export default function Home() {
       teamB={gameState.teamB}
       onEndGame={handleEndGame}
       onShowRules={handleShowRules}
+      events={events}
+      setEvents={setEvents}
+      commentaries={commentaries}
+      setCommentaries={setCommentaries}
+      score={score}
+      setScore={setScore}
     />
   );
 }
