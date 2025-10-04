@@ -30,6 +30,7 @@ type EventPanelProps = {
 const EVENT_TYPES = [
   { value: "SHOT_MADE", label: "Pogođen šut" },
   { value: "SHOT_MISSED", label: "Promašen šut" },
+  { value: "PASS", label: "Dodavanje" },
   { value: "REBOUND", label: "Skok" },
   { value: "ASSIST", label: "Asistencija" },
   { value: "STEAL", label: "Ukradena lopta" },
@@ -51,11 +52,14 @@ const PLAYER_EVENTS = [
   "TURNOVER",
   "FOUL",
   "SUBSTITUTION",
+  "PASS"
 ];
 
 const TEAM_EVENTS = ["TIMEOUT"];
 
 const SHOT_EVENTS = ["SHOT_MADE", "SHOT_MISSED"];
+
+const SECOND_PLAYER_EVENTS = ["PASS"];
 
 export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const [eventType, setEventType] = useState<string>("");
@@ -63,10 +67,12 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const [points, setPoints] = useState<string>("");
   const [shotType, setShotType] = useState<string>("");
+  const [receiverId, setReceiverId] = useState<string>("");
 
   const requiresPlayer = eventType && PLAYER_EVENTS.includes(eventType);
   const requiresTeam = eventType && TEAM_EVENTS.includes(eventType);
   const requiresShot = eventType && SHOT_EVENTS.includes(eventType);
+  const requiresOtherPlayer = eventType && SECOND_PLAYER_EVENTS.includes(eventType);
 
   const currentTeam =
     selectedTeam === "A" ? teamA : selectedTeam === "B" ? teamB : null;
@@ -101,12 +107,19 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
       // No player needed for team events like TIMEOUT
     }
 
+
     let details: Record<string, unknown> | undefined;
     if (requiresShot) {
       details = {
         points: Number.parseInt(points),
         shotType,
       };
+    }
+
+    if (requiresOtherPlayer && receiverId) {
+      details = {
+        receiverId : Number.parseInt(receiverId)
+      }
     }
 
     const event: GameEventWithId = {
@@ -189,6 +202,24 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
           <div className="space-y-2">
             <Label htmlFor="player">Igrač</Label>
             <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
+              <SelectTrigger id="player" className="bg-secondary">
+                <SelectValue placeholder="Izaberite igrača" />
+              </SelectTrigger>
+              <SelectContent>
+                {currentTeam.players.map((player) => (
+                  <SelectItem key={player.id} value={player.id.toString()}>
+                    {player.name} (#{player.number || player.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {requiresOtherPlayer && selectedTeam && currentTeam && (
+          <div className="space-y-2">
+            <Label htmlFor="player">Kome je dodao</Label>
+            <Select value={receiverId} onValueChange={setReceiverId}>
               <SelectTrigger id="player" className="bg-secondary">
                 <SelectValue placeholder="Izaberite igrača" />
               </SelectTrigger>

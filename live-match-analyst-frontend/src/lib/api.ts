@@ -18,7 +18,7 @@ export type GameEvent = {
   timestamp?: number
   playerId?: number
   teamId?: number
-  eventType: "SHOT_MADE" | "SHOT_MISSED" | "REBOUND" | "ASSIST" | "STEAL" | "BLOCK" | "TURNOVER" | "FOUL" | "TIMEOUT"
+  eventType: "SHOT_MADE" | "SHOT_MISSED" | "REBOUND" | "ASSIST" | "STEAL" | "BLOCK" | "TURNOVER" | "FOUL" | "TIMEOUT" | "PASS"
   details?: Record<string, unknown>
   processed?: boolean
 }
