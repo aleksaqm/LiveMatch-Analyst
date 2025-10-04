@@ -175,7 +175,7 @@ when
     $scorer: Player(id == $scorerId, $scorerName: name)
     $team: Team(id == $teamId, $teamName: name)
 then
-    String comment = "Sjajna tranzicija tima " + $teamName + "! Kakvu odbranu igra " + $initiatorName + ". Njegova ukradena lopta je omogućila lake poene za " + $scorerName + "!";
+    String comment = "Sjajna tranzicija tima " + $teamName + "! Kakvu odbranu igra " + $initiatorName + ". Njegova ukradena lopta je omogucila lake poene za " + $scorerName + "!";
     insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
 end
 
@@ -214,7 +214,7 @@ when
     $scorer: Player(id == $scorerId, $scorerName: name)
     $team: Team(id == $teamId, $teamName: name)
 then
-    String comment = "Odličan timski napad za tim " + $teamName + "! " + $initiatorName + " je obezbedio posed sjajnim skokom, a akciju je poenima završio " + $scorerName + "!";
+    String comment = "Odlican timski napad za tim " + $teamName + "! " + $initiatorName + " je obezbedio posed sjajnim skokom, a akciju je poenima završio " + $scorerName + "!";
 
     insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
 end

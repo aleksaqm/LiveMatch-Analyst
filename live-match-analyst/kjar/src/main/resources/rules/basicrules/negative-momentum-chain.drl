@@ -1,0 +1,192 @@
+package basicrules;
+
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.events.GameEvent.EventType;
+import com.ftn.sbnz.model.models.Score;
+import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.Player;
+import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.CommentaryLine.Importance;
+import com.ftn.sbnz.model.models.CommentaryLine.Type;
+import java.util.List;
+import java.util.ArrayList;
+
+
+declare DefensiveStreak
+    teamId: Long
+    defenseCount: int
+    lastDefenseTime: long
+end
+
+declare FastBreakAfterDefense
+    teamId: Long
+    fastBreakTime: long
+end
+
+declare DefensiveDominance
+    teamId: Long
+    startTime: long
+end
+
+
+
+rule "Level1_TwoConsecutiveDefensivePlays"
+    salience 100
+when
+    $def1: GameEvent(
+        eventType == EventType.STEAL || eventType == EventType.BLOCK,
+        $teamId: teamId,
+        eval(details == null || details.get("usedInDefensiveChain") == null),
+        $time1: timestamp
+    )
+
+    $def2: GameEvent(
+        eventType == EventType.STEAL || eventType == EventType.BLOCK,
+        teamId == $teamId,
+        timestamp > $time1,
+        eval(details == null || details.get("usedInDefensiveChain") == null),
+        timestamp <= $time1 + 60000,
+        this != $def1
+    )
+
+    not(DefensiveStreak(teamId == $teamId, lastDefenseTime > System.currentTimeMillis() - 30000))
+
+    $team: Team(id == $teamId, $teamName: name)
+then
+    if ($def1.getDetails() == null) {
+        $def1.setDetails(new java.util.HashMap<>());
+    }
+    if ($def2.getDetails() == null) {
+        $def2.setDetails(new java.util.HashMap<>());
+    }
+    modify($def1) {
+        getDetails().put("usedInDefensiveChain", true);
+    }
+    modify($def2) {
+        getDetails().put("usedInDefensiveChain", true);
+    }
+
+    insert(new DefensiveStreak($teamId, 2, $def2.getTimestamp()));
+
+    insert(new CommentaryLine(
+        "ODBRAMBENI PRESSING tima " + $teamName + "!",
+        Importance.HIGH,
+        Type.HIGHLIGHT
+    ));
+
+    System.out.println("LEVEL 1: " + $teamName + " - DVE UZASTOPNE ODBRANE!");
+end
+
+rule "Level2_FastBreakAfterDefense"
+    salience 90
+when
+    $streak: DefensiveStreak(lastDefenseTime > System.currentTimeMillis() - 30000, $teamId: teamId, $lastTime: lastDefenseTime)
+
+    $shot: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        teamId == $teamId,
+        timestamp > $lastTime,
+        timestamp <= $lastTime + 20000,
+        processed == true
+    )
+
+    not(FastBreakAfterDefense(fastBreakTime > System.currentTimeMillis() - 30000, teamId == $teamId))
+
+    $team: Team(id == $teamId, $teamName: name)
+then
+    insert(new FastBreakAfterDefense($teamId, $shot.getTimestamp()));
+
+    insert(new CommentaryLine(
+        "BRZA TRANZICIJA! " + $teamName + " konvertuje odbranu u poene!",
+        Importance.HIGH,
+        Type.HIGHLIGHT
+    ));
+
+
+    System.out.println("LEVEL 2: " + $teamName + " - BRZA TRANZICIJA POSLE ODBRANE!");
+end
+
+rule "Level3_OpponentTurnoverAfterFastBreak"
+    salience 80
+when
+    $fastBreak: FastBreakAfterDefense(fastBreakTime > System.currentTimeMillis() - 30000, $teamId: teamId, $fbTime: fastBreakTime)
+
+    $score: Score()
+
+    $team: Team(id == $teamId)
+
+    $turnover: GameEvent(
+        eventType == EventType.TURNOVER,
+        teamId != $teamId,
+        timestamp > $fbTime,
+        timestamp <= $fbTime + 30000,
+        eval(details == null || details.get("usedInDefensiveChain") == null),
+        $oppTeamId: teamId
+    )
+
+    not(DefensiveDominance(startTime > System.currentTimeMillis() - 30000, teamId == $teamId))
+
+    $oppTeam: Team(id == $oppTeamId, $oppTeamName: name)
+then
+    if ($turnover.getDetails() == null) {
+            $turnover.setDetails(new java.util.HashMap<>());
+    }
+    modify($turnover) { getDetails().put("usedInDefensiveChain", true); }
+
+    insert(new DefensiveDominance($teamId, System.currentTimeMillis()));
+
+    insert(new CommentaryLine(
+        "TOTALNI HAOS! " + $oppTeamName + " gubi loptu pod pritiskom!",
+        Importance.CRITICAL,
+        Type.HIGHLIGHT
+    ));
+
+
+
+    System.out.println("LEVEL 3: " + $oppTeamName + " GUBI LOPTU! Defanzivni pritisak radi!");
+end
+
+rule "Level4_DesperationFoul"
+    salience 70
+when
+    $streak: DefensiveStreak(lastDefenseTime > System.currentTimeMillis() - 30000, $teamId: teamId)
+    $fastBreak: FastBreakAfterDefense(fastBreakTime > System.currentTimeMillis() - 30000, teamId == $teamId)
+    $dominance: DefensiveDominance(startTime > System.currentTimeMillis() - 30000, teamId == $teamId, $startTime: startTime)
+
+    $foul: GameEvent(
+        eventType == EventType.FOUL,
+        teamId != $teamId,
+        timestamp > $startTime,
+        timestamp <= $startTime + 45000,
+        eval(details == null || details.get("usedInDefensiveChain") == null),
+        $oppTeamId: teamId
+    )
+
+    $team: Team(id == $teamId, $teamName: name)
+    $oppTeam: Team(id == $oppTeamId, $oppTeamName: name)
+then
+    $foul.setDetails(new java.util.HashMap<>());
+    modify($foul) {
+        getDetails().put("usedInDefensiveChain", true)
+    }
+
+    insert(new CommentaryLine(
+        "DEFENSIVNA DOMINACIJA! " + $oppTeamName + " IZ NEMOCI FAULIRA!",
+        Importance.CRITICAL,
+        Type.HIGHLIGHT
+    ));
+
+    insert(new CommentaryLine(
+        $teamName + " je potpuno preuzeo kontrolu! " + $oppTeamName + " ne zna sta da radi!",
+        Importance.HIGH,
+        Type.ANALYSIS
+    ));
+
+    System.out.println("LEVEL 4: DEFANZIVNA DOMINACIJA  " + $oppTeamName + " FAULIRA IZ NEMOCI!");
+
+    retract($dominance);
+    retract($fastBreak);
+    retract($streak);
+
+end
+
