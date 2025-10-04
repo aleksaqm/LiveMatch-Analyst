@@ -31,20 +31,28 @@ export function GameScreen({
   teamB,
   onEndGame,
   onShowRules,
+  events,
+  setEvents,
+  commentaries,
+  setCommentaries,
+  score,
+  setScore,
 }: {
   teamA: Team;
   teamB: Team;
   onEndGame: () => void;
   onShowRules: () => void;
+  events: GameEventWithId[];
+  setEvents: (
+    v: GameEventWithId[] | ((prev: GameEventWithId[]) => GameEventWithId[])
+  ) => void;
+  commentaries: Commentary[];
+  setCommentaries: (
+    v: Commentary[] | ((prev: Commentary[]) => Commentary[])
+  ) => void;
+  score: Score;
+  setScore: (s: Score | ((prev: Score) => Score)) => void;
 }) {
-  const [events, setEvents] = useState<GameEventWithId[]>([]);
-  const [commentaries, setCommentaries] = useState<Commentary[]>([]);
-  const [score, setScore] = useState<Score>({
-    team1Id: teamA.id,
-    team2Id: teamB.id,
-    team1Score: 0,
-    team2Score: 0,
-  });
   const { toast } = useToast();
 
   // Game is already initialized by parent component
