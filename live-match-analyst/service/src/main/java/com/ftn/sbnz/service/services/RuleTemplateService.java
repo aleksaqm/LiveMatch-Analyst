@@ -59,18 +59,37 @@ public class RuleTemplateService {
     }
     
     private String loadTemplateFromResource(String resourcePath) throws Exception {
+        // First try Spring's ClassPathResource (works for files on the service classpath)
         ClassPathResource resource = new ClassPathResource(resourcePath);
-        
-        if (!resource.exists()) {
-            throw new Exception("Template resource not found: " + resourcePath);
+        if (resource.exists()) {
+            try (InputStream inputStream = resource.getInputStream()) {
+                String content = new String(inputStream.readAllBytes());
+                System.out.println("Successfully loaded template from classpath resource: " + resourcePath + " (length: " + content.length() + " characters)");
+                return content;
+            } catch (Exception e) {
+                System.err.println("Error reading template from classpath resource: " + resourcePath + " - " + e.getMessage());
+                throw e;
+            }
         }
-        
-        try (InputStream inputStream = resource.getInputStream()) {
+
+        // If not found on this module's classpath, try the thread context classloader
+        String normalizedPath = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+        InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(normalizedPath);
+        if (is == null) {
+            // Try with the original path (some jars keep leading slash differently)
+            is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath);
+        }
+
+        if (is == null) {
+            throw new Exception("Template resource not found on classpath or kjar: " + resourcePath + " (checked ClassPathResource and ClassLoader)");
+        }
+
+        try (InputStream inputStream = is) {
             String content = new String(inputStream.readAllBytes());
-            System.out.println("Successfully loaded template from: " + resourcePath + " (length: " + content.length() + " characters)");
+            System.out.println("Successfully loaded template from classloader (possibly kjar): " + normalizedPath + " (length: " + content.length() + " characters)");
             return content;
         } catch (Exception e) {
-            System.err.println("Error reading template from: " + resourcePath + " - " + e.getMessage());
+            System.err.println("Error reading template from classloader resource: " + normalizedPath + " - " + e.getMessage());
             throw e;
         }
     }
