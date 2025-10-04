@@ -38,20 +38,9 @@ const EVENT_LABELS: Record<string, string> = {
   TURNOVER: "Izgubljena lopta",
   FOUL: "Faul",
   TIMEOUT: "Tajm-aut",
-  SUBSTITUTION: "Izmena",
-  QUARTER_END: "Kraj četvrtine",
 };
 
 export function EventsList({ events }: EventsListProps) {
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("sr-RS", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -96,7 +85,7 @@ export function EventsList({ events }: EventsListProps) {
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {formatTime(event.timestamp)}
+                      {event.timestamp}
                     </div>
                   </div>
                 </div>

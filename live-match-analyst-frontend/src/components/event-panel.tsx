@@ -38,8 +38,6 @@ const EVENT_TYPES = [
   { value: "TURNOVER", label: "Izgubljena lopta" },
   { value: "FOUL", label: "Faul" },
   { value: "TIMEOUT", label: "Tajm-aut" },
-  { value: "SUBSTITUTION", label: "Izmena" },
-  { value: "QUARTER_END", label: "Kraj četvrtine" },
 ];
 
 const PLAYER_EVENTS = [
@@ -51,8 +49,7 @@ const PLAYER_EVENTS = [
   "BLOCK",
   "TURNOVER",
   "FOUL",
-  "SUBSTITUTION",
-  "PASS"
+  "PASS",
 ];
 
 const TEAM_EVENTS = ["TIMEOUT"];
@@ -72,7 +69,8 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
   const requiresPlayer = eventType && PLAYER_EVENTS.includes(eventType);
   const requiresTeam = eventType && TEAM_EVENTS.includes(eventType);
   const requiresShot = eventType && SHOT_EVENTS.includes(eventType);
-  const requiresOtherPlayer = eventType && SECOND_PLAYER_EVENTS.includes(eventType);
+  const requiresOtherPlayer =
+    eventType && SECOND_PLAYER_EVENTS.includes(eventType);
 
   const currentTeam =
     selectedTeam === "A" ? teamA : selectedTeam === "B" ? teamB : null;
@@ -107,7 +105,6 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
       // No player needed for team events like TIMEOUT
     }
 
-
     let details: Record<string, unknown> | undefined;
     if (requiresShot) {
       details = {
@@ -118,8 +115,8 @@ export function EventPanel({ teamA, teamB, onEventSent }: EventPanelProps) {
 
     if (requiresOtherPlayer && receiverId) {
       details = {
-        receiverId : Number.parseInt(receiverId)
-      }
+        receiverId: Number.parseInt(receiverId),
+      };
     }
 
     const event: GameEventWithId = {

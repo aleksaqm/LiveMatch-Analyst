@@ -32,7 +32,7 @@ rule "Scoring_Streak_@{row.rowNumber}"
             ) over window:time(@{timeWindowMinutes}m)
         )
     then
-        String dynamicComment = "@{commentText}" + " " + $player.getName() + " dao " + $streakCount + " šuteva za redom  i sada ima ukupno " + $stats.getPoints() + " poena !";
+        String dynamicComment = "@{commentText}" + " " + $player.getName() + " dao " + $streakCount + " suteva za redom  i sada ima ukupno " + $stats.getPoints() + " poena !";
         insert(new CommentaryLine(
             dynamicComment,
             CommentaryLine.Importance.valueOf("@{importance}"),
