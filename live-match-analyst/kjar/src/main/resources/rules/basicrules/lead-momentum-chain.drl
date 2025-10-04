@@ -1,0 +1,179 @@
+package basicrules;
+
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.events.GameEvent.EventType;
+import com.ftn.sbnz.model.models.Score;
+import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.CommentaryLine.Importance;
+import com.ftn.sbnz.model.models.CommentaryLine.Type;
+
+declare LeadTaken
+    leadingTeamId: Long
+    trailingTeamId: Long
+    leadMargin: int
+    whenTaken: long
+end
+
+declare TimeoutProcessed
+    timeoutTimestamp: long
+    teamId: Long
+end
+
+// Query to check if a team just took the lead with their shot
+query "teamJustTookLead"(Long teamId, Number pointsScored, Score currentScore)
+    // Calculate what the score was BEFORE this shot
+    $prevTeam1Score: Number() from (teamId.equals(currentScore.getTeam1Id()) ? 
+        currentScore.getTeam1Score() - pointsScored.intValue() : currentScore.getTeam1Score())
+    $prevTeam2Score: Number() from (teamId.equals(currentScore.getTeam2Id()) ? 
+        currentScore.getTeam2Score() - pointsScored.intValue() : currentScore.getTeam2Score())
+    
+    $leadMargin: Number() from (Math.abs(currentScore.getTeam1Score() - currentScore.getTeam2Score()))
+
+    // Check that the SCORING TEAM is NOW leading after their shot
+    eval(
+        (teamId.equals(currentScore.getTeam1Id()) && currentScore.getTeam1Score() > currentScore.getTeam2Score()) ||
+        (teamId.equals(currentScore.getTeam2Id()) && currentScore.getTeam2Score() > currentScore.getTeam1Score())
+    )
+    
+    // Check that the SCORING TEAM was NOT leading before (was trailing or tied)
+    eval(
+        (teamId.equals(currentScore.getTeam1Id()) && $prevTeam1Score.intValue() <= $prevTeam2Score.intValue()) ||
+        (teamId.equals(currentScore.getTeam2Id()) && $prevTeam2Score.intValue() <= $prevTeam1Score.intValue())
+    )
+
+    eval(
+        ($leadMargin.intValue() <= 3) && (
+            (pointsScored.intValue() == 3) ||
+            ($leadMargin.intValue() == 2 && pointsScored.intValue() == 2) ||
+            ($leadMargin.intValue() == 1 && 
+                (pointsScored.intValue() == 1 || pointsScored.intValue() == 2 || pointsScored.intValue() == 3)
+            )
+        )
+    )
+end
+
+// LEVEL 1: Simple lead detection after shot
+rule "Level1_SimpleLeadAfterShot"
+    salience 100
+when
+    $event: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        processed == true,
+        $teamId: teamId,
+        $points: details["points"]
+    )
+    // Only match the most recent shot event
+    not GameEvent(
+        eventType == EventType.SHOT_MADE,
+        processed == true,
+        timestamp > $event.timestamp
+    )
+    $score: Score()
+    $team: Team(id == $teamId, $teamName: name)
+    
+    $pointsInt: Number() from $points
+    
+    // Use the query to check if team just took the lead
+    teamJustTookLead($teamId, $pointsInt, $score;)
+    
+    $leadMargin: Number() from (Math.abs($score.getTeam1Score() - $score.getTeam2Score()))
+then
+    long currentTime = System.currentTimeMillis();
+    int leadMargin = $leadMargin.intValue();
+    Long trailingTeamId = $teamId.equals($score.getTeam1Id()) ? $score.getTeam2Id() : $score.getTeam1Id();
+    
+    insert(new LeadTaken($teamId, trailingTeamId, leadMargin, currentTime));
+    insert(new CommentaryLine(
+        $teamName + " PRELAZI U VODJSTVO! Razlika: " + leadMargin + " poena!",
+        Importance.HIGH,
+        Type.HIGHLIGHT
+    ));
+
+    System.out.println("LEVEL 1: " + $teamName + " PRELAZI U VODJSTVO!");
+end
+
+rule "Level2_TimeoutAfterLeadTaken"
+    salience 80
+when
+    $leadTaken: LeadTaken($leadingTeamId: leadingTeamId, $trailingTeamId: trailingTeamId, leadMargin >= 1)
+    
+    // Timeout called by the trailing team
+    $timeout: GameEvent(eventType == EventType.TIMEOUT, teamId == $trailingTeamId, processed == false)
+    
+    $leadingTeam: Team(id == $leadingTeamId, $leadingTeamName: name)
+    $trailingTeam: Team(id == $trailingTeamId, $trailingTeamName: name)
+then
+    // Mark timeout as processed
+    modify($timeout) { setProcessed(true) }
+    
+    // Calculate how long they waited before calling timeout
+    long delayTime = (System.currentTimeMillis() - $leadTaken.getWhenTaken()) / 1000;
+    
+    insert(new CommentaryLine("TIMEOUT " + $trailingTeamName + "! Trener reaguje na gubitak vodjstva!", 
+                             Importance.CRITICAL, Type.HIGHLIGHT));
+    
+    retract($leadTaken);
+    
+    System.out.println("LEVEL 2: TIMEOUT! " + $trailingTeamName + " calls timeout after losing lead (" + delayTime + " seconds)");
+end
+
+// LEVEL 3: Team response after calling timeout
+rule "Level3_GoodTimeoutResponse"
+    salience 70
+    no-loop true
+when
+    $event: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        processed == true,
+        $teamId: teamId,
+        $points: details["points"]
+    )
+
+    $timeout: GameEvent(
+        eventType == EventType.TIMEOUT,
+        teamId == $teamId,
+        processed == true
+    ) over window:time(2m)
+
+    eval($event.getTimestamp() > $timeout.getTimestamp())
+    
+    not TimeoutProcessed(
+        timeoutTimestamp == $timeout.getTimestamp(),
+        teamId == $teamId
+    )
+
+    $score: Score()
+    $team: Team(id == $teamId, $teamName: name)
+
+    $pointsInt: Number() from $points
+
+    $leadMargin: Number() from (Math.abs($score.getTeam1Score() - $score.getTeam2Score()))
+
+    $isLeading: Boolean() from (
+        ($teamId.equals($score.getTeam1Id()) && $score.getTeam1Score() >= $score.getTeam2Score()) ||
+        ($teamId.equals($score.getTeam2Id()) && $score.getTeam2Score() >= $score.getTeam1Score())
+    )
+
+    eval(
+        $isLeading.booleanValue() || $pointsInt.intValue() >= 2
+    )
+then
+    insert(new TimeoutProcessed($timeout.getTimestamp(), $teamId));
+    
+    insert(new CommentaryLine(
+        "DOBAR TIMEOUT! " + $teamName + " se vraca u igru!",
+        Importance.HIGH,
+        Type.HIGHLIGHT
+    ));
+
+    if ($isLeading.booleanValue() && $leadMargin.intValue() > 0) {
+        insert(new CommentaryLine(
+            "Odlican odgovor! " + $teamName + " preuzima kontrolu posle timeout-a!",
+            Importance.MEDIUM,
+            Type.ANALYSIS
+        ));
+    }
+    System.out.println("LEVEL 3: " + $teamName + " good response after timeout! Points: " + $pointsInt.intValue());
+end
+

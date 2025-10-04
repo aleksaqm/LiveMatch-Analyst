@@ -3,6 +3,7 @@ package com.ftn.sbnz.model.events;
 import org.kie.api.definition.type.Expires;
 import org.kie.api.definition.type.Role;
 import org.kie.api.definition.type.Timestamp;
+import org.kie.api.definition.type.Position;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -13,12 +14,14 @@ import java.util.Map;
 @Expires("3m")
 public class GameEvent {
     public enum EventType {
-        SHOT_MADE, SHOT_MISSED, REBOUND, ASSIST, STEAL, BLOCK, TURNOVER, FOUL
+        SHOT_MADE, SHOT_MISSED, REBOUND, ASSIST, STEAL, BLOCK, TURNOVER, FOUL, TIMEOUT, PASS
     }
 
     private long timestamp;
+    @Position(1)
     private Long playerId;
     private Long teamId;
+    @Position(0)
     private EventType eventType;
     private Map<String, Object> details;
     private boolean processed;

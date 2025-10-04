@@ -1,0 +1,221 @@
+package basicrules;
+
+import com.ftn.sbnz.model.events.GameEvent;
+import com.ftn.sbnz.model.events.GameEvent.EventType;
+import com.ftn.sbnz.model.models.PlayerStats;
+import com.ftn.sbnz.model.models.Player;
+import com.ftn.sbnz.model.models.Team;
+import com.ftn.sbnz.model.models.CommentaryLine;
+import com.ftn.sbnz.model.models.CommentaryLine.Importance;
+import com.ftn.sbnz.model.models.CommentaryLine.Type;
+
+
+declare ThreePointerMilestone
+    playerId: Long
+    milestoneMade: int
+end
+
+declare DefensiveStreakMilestone
+    teamId: Long
+    stopCount: int
+    timeMarker: long
+end
+
+declare ScoringRunMilestone
+    teamId: Long
+    runPoints: int
+    timeMarker: long
+end
+
+rule "SixthThreePointerComment"
+when
+    $event: GameEvent(eventType == EventType.SHOT_MADE, details["points"] == 3, processed == true, $playerId: playerId, $teamId: teamId)
+    $stats: PlayerStats(playerId == $playerId, threePointersMade >= 6)
+    $player: Player(id == $playerId, $playerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+    
+    // Only fire if we haven't already commented on this exact milestone
+    not ThreePointerMilestone(playerId == $playerId, milestoneMade == $stats.getThreePointersMade())
+then
+    insert(new ThreePointerMilestone($playerId, $stats.getThreePointersMade()));
+    insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je vec "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
+end
+
+rule "FastbreakOpportunityComment"
+when
+    $event: GameEvent(eventType == EventType.TURNOVER, $teamId: teamId)
+    $team: Team(id == $teamId)
+    $opponent: Team(id != $teamId, $opponentName: name)
+then
+    insert(new CommentaryLine("Prilika za brzu kontru za tim " + $opponentName + "!", Importance.MEDIUM, Type.ANALYSIS));
+end
+
+rule "DefensiveStopStreakComment"
+salience 100  
+when
+    $team: Team($teamId: id, $stoppedTeamName: name)
+    $stops: Number(intValue >= 6) from accumulate (
+        GameEvent(
+            (eventType == EventType.SHOT_MISSED || eventType == EventType.TURNOVER),
+            teamId == $teamId
+        ) over window:time(2m),
+        count(1)
+    )
+    not (GameEvent(eventType == EventType.SHOT_MADE, teamId == $teamId) over window:time(1m))
+    $defendingTeam: Team(id != $teamId, $defendingTeamName: name)
+    
+    // Prevent duplication by checking if we already commented on similar streak recently
+    not DefensiveStreakMilestone(teamId != $teamId, stopCount >= ($stops.intValue() - 1), timeMarker > (System.currentTimeMillis() - 120000))
+then
+    long currentTime = System.currentTimeMillis();
+    insert(new DefensiveStreakMilestone($defendingTeam.getId(), $stops.intValue(), currentTime));
+    insert(new CommentaryLine("Odlicna defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspesnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
+end
+
+
+rule "ScoringRunComment"
+when
+    $team: Team($teamId: id, $teamName: name)
+    $run: Number(intValue >= 8) from accumulate (
+        GameEvent(
+            eventType == EventType.SHOT_MADE,
+            teamId == $teamId,
+            $points: details['points']
+        ) over window:time(2m),
+        sum($points)
+    )
+    not (GameEvent(
+        eventType == EventType.SHOT_MADE,
+        teamId != $teamId
+    ) over window:time(2m))
+    $opposingTeam: Team(id != $teamId, $opposingTeamName: name)
+    
+    // Prevent duplication by checking if we already commented on similar run recently
+    not ScoringRunMilestone(teamId == $teamId, runPoints >= ($run.intValue() - 2), timeMarker > (System.currentTimeMillis() - 120000))
+then
+    long currentTime = System.currentTimeMillis();
+    insert(new ScoringRunMilestone($teamId, $run.intValue(), currentTime));
+    insert(new CommentaryLine(
+        "Kakva serija tima " + $teamName + "! Rezultat je " + $run.intValue() + "-0 u poslednja dva minuta!",
+        Importance.HIGH,
+        Type.ANALYSIS
+    ));
+end
+
+// Rekurzivni upit koji proverava unazad da li postoji lanac dodavanja izmedju 2 igraca
+query getBasketInitiator(long $initiatorId, long $lastPlayerId, long $previousTime)
+    (
+        // Osnovni slucaj, ako je igrac nas initiator koji ima STEEL ili REBOUND (njegov id smo pretpostavili u rule-u)
+        // I ako ne postoji jos neko dodavanje ka njemu da se nastavi lanac
+        eval($initiatorId == $lastPlayerId)
+        and not GameEvent(
+            eventType == EventType.PASS,
+            details["receiverId"] == $lastPlayerId,
+            $previousPasser: playerId,
+            timestamp < $previousTime,
+            timestamp >= ($previousTime - 10000),
+            $passChainTime: timestamp
+        )
+    )
+    or
+    (
+        // Proveravamo da li postoji neko dodavanje ka trenutnom igracu, ako postoji pozivamo rekurzivno ovaj rule
+        GameEvent(
+            eventType == EventType.PASS,
+            details["receiverId"] == $lastPlayerId,
+            $previousPasser: playerId,
+            timestamp < $previousTime,
+            timestamp >= ($previousTime - 10000),
+            $passChainTime: timestamp
+        )
+        and
+        getBasketInitiator($initiatorId, $previousPasser, $passChainTime;)
+    )
+end
+
+
+
+rule "Analyze pass chain of basket with steal as initiator candidate"
+when
+
+    // kad se desi SHOT_MADE event ovaj rule trazi kako je doslo do njega, ko je inicirao akciju pomocu rekurzivnog queryja
+    $shot: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        (details["points"] == 2 || details["points"] == 3),
+        $scorerId: playerId,
+        $teamId: teamId,
+        $shotTime: timestamp
+    )
+
+
+    // pronadje igraca koji je dodao igracu koji je postigao kos
+    $finalPass: GameEvent(
+        eventType == EventType.PASS,
+        details["receiverId"] == $scorerId,
+        $finalPasser: playerId,
+        timestamp < $shotTime,
+        timestamp >= ($shotTime - 10000),
+        $passTime: timestamp
+    )
+
+    // pronadje potencijalne kandidate za iniciranje akcije, ako je imao ukredenu loptu u prethodne 24 sekunde sto je jedan kosarkaski napad
+    // rekurzivni query pokusava da spoji lanac od igraca koji je postigao kos pa sve do ovog igraca
+    // u realnoj kosarkaskoj utakmici ce postojati samo jedan igrac koji je ukrao loptu u jednom napadu
+    $initiatorCandidateEvent: GameEvent(
+        eventType == EventType.STEAL,
+        teamId == $teamId,
+        $initiatorCandidateId: playerId,
+        timestamp < $shotTime,
+        timestamp >= ($shotTime - 24000)
+    )
+
+    getBasketInitiator($initiatorCandidateId, $finalPasser, $passTime;)
+
+    $initiator: Player(id == $initiatorCandidateId, $initiatorName: name)
+    $scorer: Player(id == $scorerId, $scorerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    String comment = "Sjajna tranzicija tima " + $teamName + "! Kakvu odbranu igra " + $initiatorName + ". Njegova ukradena lopta je omogucila lake poene za " + $scorerName + "!";
+    insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
+end
+
+
+// rule radi sve isto samo za skok a ne ukradenu loptu
+rule "Analyze pass chain of basket with rebound as initiator candidate"
+when
+    $shot: GameEvent(
+        eventType == EventType.SHOT_MADE,
+        (details["points"] == 2 || details["points"] == 3),
+        $scorerId: playerId,
+        $teamId: teamId,
+        $shotTime: timestamp
+    )
+
+    $finalPass: GameEvent(
+        eventType == EventType.PASS,
+        details["receiverId"] == $scorerId,
+        $finalPasser: playerId,
+        timestamp < $shotTime,
+        timestamp >= ($shotTime - 10000),
+        $passTime: timestamp
+    )
+
+    $initiatorCandidateEvent: GameEvent(
+        eventType == EventType.REBOUND,
+        teamId == $teamId,
+        $initiatorCandidateId: playerId,
+        timestamp < $shotTime,
+        timestamp >= ($shotTime - 24000)
+    )
+
+    getBasketInitiator($initiatorCandidateId, $finalPasser, $passTime;)
+
+    $initiator: Player(id == $initiatorCandidateId, $initiatorName: name)
+    $scorer: Player(id == $scorerId, $scorerName: name)
+    $team: Team(id == $teamId, $teamName: name)
+then
+    String comment = "Odlican timski napad za tim " + $teamName + "! " + $initiatorName + " je obezbedio posed sjajnim skokom, a akciju je poenima zavrsio " + $scorerName + "!";
+
+    insert(new CommentaryLine(comment, Importance.HIGH, Type.ANALYSIS));
+end
+
