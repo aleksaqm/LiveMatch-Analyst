@@ -43,7 +43,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio slobodno bacanje.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promasio slobodno bacanje.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "FieldGoalMadeComment"
@@ -62,7 +62,7 @@ then
         setProcessed(true)
     }
 
-    String shotTypeText = "šut";
+    String shotTypeText = "sut";
     if ($event.getDetails().containsKey("shotType")) {
         shotTypeText = (String) $event.getDetails().get("shotType");
     }
@@ -83,12 +83,12 @@ then
         setProcessed(true)
     }
     
-    String shotTypeText = "šut";
+    String shotTypeText = "sut";
     if ($event.getDetails().containsKey("shotType")) {
         shotTypeText = (String) $event.getDetails().get("shotType");
     }
     
-    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio " + shotTypeText + " za 2.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promasio " + shotTypeText + " za 2.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "ReboundComment"
@@ -105,7 +105,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Skok! " + $playerName + " iz tima " + $teamName + " je uhvatio skok! To mu je " + ($stats.getRebounds()) + ". skok u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Skok! " + $playerName + " iz tima " + $teamName + " je uhvatio skok! To mu je " + ($stats.getRebounds()) + ". skok u mecu.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "StealComment"
@@ -122,7 +122,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Ukradena lopta! " + $playerName + " iz tima " + $teamName + " je ukrao loptu! To mu je " + ($stats.getSteals()) + ". ukradena na meču.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Ukradena lopta! " + $playerName + " iz tima " + $teamName + " je ukrao loptu! To mu je " + ($stats.getSteals()) + ". ukradena na mecu.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
 end
 
 rule "BlockComment"
@@ -139,7 +139,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Rampa! " + $playerName + " iz tima " + $teamName + " je blokirao šut! To mu je " + ($stats.getBlocks()) + ". blokada na meču.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Rampa! " + $playerName + " iz tima " + $teamName + " je blokirao sut! To mu je " + ($stats.getBlocks()) + ". blokada na mecu.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
 end
 
 rule "TurnoverComment"
@@ -156,7 +156,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Greška! " + $playerName + " iz tima " + $teamName + " je izgubio loptu.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Greska! " + $playerName + " iz tima " + $teamName + " je izgubio loptu.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "ThreePointerMadeComment"
@@ -192,7 +192,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promašio trojku.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine($playerName + " iz tima " + $teamName + " je promasio trojku.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "AssistComment"
@@ -209,7 +209,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists()) + ". asistencija u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Asistencija od " + $playerName + " iz tima " + $teamName + "! To mu je " + ($stats.getAssists()) + ". asistencija u mecu.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "FoulComment"
@@ -226,7 +226,7 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Faul! " + $playerName + " iz tima " + $teamName + " je napravio faul. To mu je " + ($stats.getFouls()) + ". faul u meču.", Importance.LOW, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Faul! " + $playerName + " iz tima " + $teamName + " je napravio faul. To mu je " + ($stats.getFouls()) + ". faul u mecu.", Importance.LOW, Type.PLAY_BY_PLAY));
 end
 
 rule "UpdateScoreOnShotMade"
@@ -258,5 +258,5 @@ then
         setProcessed(true)
     }
     
-    insert(new CommentaryLine("Timeout! Tim " + $teamName + " je zatražio prekid.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
+    insert(new CommentaryLine("Timeout! Tim " + $teamName + " je zatrazio prekid.", Importance.MEDIUM, Type.PLAY_BY_PLAY));
 end

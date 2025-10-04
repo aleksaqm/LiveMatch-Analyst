@@ -39,7 +39,7 @@ when
     not ThreePointerMilestone(playerId == $playerId, milestoneMade == $stats.getThreePointersMade())
 then
     insert(new ThreePointerMilestone($playerId, $stats.getThreePointersMade()));
-    insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je već "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
+    insert(new CommentaryLine("Neverovatni " + $playerName + " iz tima " + $teamName + " nastavlja svoju seriju sa distance, ovo mu je vec "  + $stats.getThreePointersMade() +  ". trojka!", Importance.HIGH, Type.HIGHLIGHT));
 end
 
 rule "FastbreakOpportunityComment"
@@ -70,7 +70,7 @@ when
 then
     long currentTime = System.currentTimeMillis();
     insert(new DefensiveStreakMilestone($defendingTeam.getId(), $stops.intValue(), currentTime));
-    insert(new CommentaryLine("Odlična defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspešnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
+    insert(new CommentaryLine("Odlicna defanziva! Tim " + $defendingTeamName + " je prisiljavao " + $stoppedTeamName + " na " + $stops + " neuspesnih napada u poslednja 2 minuta.", Importance.HIGH, Type.ANALYSIS));
 end
 
 

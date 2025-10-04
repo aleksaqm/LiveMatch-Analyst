@@ -85,7 +85,7 @@ then
     
     insert(new LeadTaken($teamId, trailingTeamId, leadMargin, currentTime));
     insert(new CommentaryLine(
-        $teamName + " PRELAZI U VOĐSTVO! Razlika: " + leadMargin + " poena!",
+        $teamName + " PRELAZI U VODJSTVO! Razlika: " + leadMargin + " poena!",
         Importance.HIGH,
         Type.HIGHLIGHT
     ));
@@ -110,7 +110,7 @@ then
     // Calculate how long they waited before calling timeout
     long delayTime = (System.currentTimeMillis() - $leadTaken.getWhenTaken()) / 1000;
     
-    insert(new CommentaryLine("TIMEOUT " + $trailingTeamName + "! Trener reaguje na gubitak vođstva!", 
+    insert(new CommentaryLine("TIMEOUT " + $trailingTeamName + "! Trener reaguje na gubitak vodjstva!", 
                              Importance.CRITICAL, Type.HIGHLIGHT));
     
     retract($leadTaken);
@@ -162,14 +162,14 @@ then
     insert(new TimeoutProcessed($timeout.getTimestamp(), $teamId));
     
     insert(new CommentaryLine(
-        "DOBAR TIMEOUT! " + $teamName + " se vraća u igru!",
+        "DOBAR TIMEOUT! " + $teamName + " se vraca u igru!",
         Importance.HIGH,
         Type.HIGHLIGHT
     ));
 
     if ($isLeading.booleanValue() && $leadMargin.intValue() > 0) {
         insert(new CommentaryLine(
-            "Odličan odgovor! " + $teamName + " preuzima kontrolu posle timeout-a!",
+            "Odlican odgovor! " + $teamName + " preuzima kontrolu posle timeout-a!",
             Importance.MEDIUM,
             Type.ANALYSIS
         ));
